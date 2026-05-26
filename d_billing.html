@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Modern Billing Page</title>
+
+<link rel="stylesheet" href="d-_billing.css">
+
+</head>
+
+<body>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+
+  <h2>🛒 Grocery</h2>
+
+  <ul>
+    <li onclick="go('b_dashboard.html')">Dashboard</li>
+    <li onclick="go('c_product.html')">Products</li>
+    <li onclick="go('d_billing.html')">Billing</li>
+    <li onclick="go('e_invoice.html')">Invoice</li>
+    <li onclick="go('f_history.html')">History</li>
+    <li onclick="go('g_report.html')">Report</li>
+    <li onclick="logout()">Logout</li>
+  </ul>
+
+  <button onclick="toggleMode()">🌙 Dark Mode</button>
+
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+<div class="card">
+
+<!-- HEADER -->
+<div class="card-header">
+
+  <h2>🛒 Grocery Billing</h2>
+
+  <div>
+    <strong>Invoice:</strong>
+    <span id="invoiceNo"></span>
+    <br>
+
+    <strong>Date:</strong>
+    <span id="dateTime"></span>
+  </div>
+
+</div>
+
+<!-- CUSTOMER DETAILS -->
+<div class="section">
+
+  <h3>Customer Details</h3>
+
+  <input type="text" id="cname" placeholder="Customer Name">
+
+  <input type="number" id="cmobile" placeholder="Mobile Number">
+
+</div>
+
+<!-- PRODUCT SECTION -->
+<div class="section">
+
+  <h3>Add Product</h3>
+
+  <input type="text" id="pname" placeholder="Product Name">
+
+  <input type="number" id="price" placeholder="Price">
+
+  <input type="number" id="qty" placeholder="Quantity">
+
+  <button onclick="addItem()">Add Product</button>
+
+</div>
+
+<!-- BILL TABLE -->
+<div class="table-wrap">
+
+<table>
+
+<thead>
+<tr>
+  <th>Item</th>
+  <th>Price</th>
+  <th>Qty</th>
+  <th>Total</th>
+</tr>
+</thead>
+
+<tbody id="billTable"></tbody>
+
+</table>
+
+</div>
+
+<!-- GST & DISCOUNT -->
+<div class="section">
+
+  <h3>GST & Discount</h3>
+
+  <input type="number" id="gst" value="2" placeholder="GST %">
+
+  <input type="number" id="discount" value="0" placeholder="Discount %">
+
+</div>
+
+<!-- PAYMENT -->
+<div class="section">
+
+  <h3>Payment Method</h3>
+
+  <select id="paymentType" onchange="togglePayment()">
+    <option>Cash</option>
+    <option>UPI</option>
+    <option>Card</option>
+  </select>
+
+  <!-- QR SECTION -->
+  <div id="qrSection">
+    <img src="images/QR Scanner image.jpeg" width="180">
+  </div>
+
+  <!-- CARD SECTION -->
+  <div id="cardSection">
+
+    <input id="cardNumber" placeholder="Card Number">
+
+    <input id="expiry" placeholder="MM/YY">
+
+    <input id="cvv" placeholder="CVV">
+
+  </div>
+
+  <!-- PIN SECTION -->
+  <div id="pinSection">
+
+    <input
+      id="pin"
+      type="password"
+      maxlength="4"
+      placeholder="Enter PIN"
+    >
+
+    <button onclick="confirmPayment()">
+      Confirm Payment
+    </button>
+
+  </div>
+
+</div>
+
+<!-- TOTAL -->
+<div class="total-box">
+
+  ₹ <span id="grandTotal">0</span>
+
+</div>
+
+<br>
+
+<button onclick="saveBill()">Save Bill</button>
+
+</div>
+</div>
+
+<script>
+
+let items = [];
+let subTotal = 0;
+
+/* DATE & INVOICE */
+document.getElementById("dateTime").innerText =
+new Date().toLocaleString();
+
+document.getElementById("invoiceNo").innerText =
+localStorage.getItem("invoiceNo") || 1;
+
+/* PAGE NAVIGATION */
+function go(page){
+  window.location.href = page;
+}
+
+/* LOGOUT */
+function logout(){
+
+  alert("Logged out Successfully");
+
+  window.location.href = "a_login.html";
+}
+
+/* DARK MODE */
+function toggleMode(){
+  document.body.classList.toggle("dark");
+}
+
+/* ADD ITEM */
+function addItem(){
+
+  let name = pname.value.trim();
+  let priceVal = Number(price.value);
+  let qtyVal = Number(qty.value);
+
+  if(name === "" || priceVal <= 0 || qtyVal <= 0){
+
+    alert("Enter valid product details");
+
+    return;
+  }
+
+  let total = priceVal * qtyVal;
+
+  subTotal += total;
+
+  items.push({
+    name:name,
+    price:priceVal,
+    qty:qtyVal,
+    total:total
+  });
+
+  billTable.innerHTML += `
+    <tr>
+      <td>${name}</td>
+      <td>₹${priceVal}</td>
+      <td>${qtyVal}</td>
+      <td>₹${total}</td>
+    </tr>
+  `;
+
+  calculateTotal();
+
+  pname.value = "";
+  price.value = "";
+  qty.value = "";
+}
+
+/* CALCULATE TOTAL */
+function calculateTotal(){
+
+  let gstVal = Number(gst.value);
+
+  let disVal = Number(discount.value);
+
+  let gstAmt = subTotal * gstVal / 100;
+
+  let disAmt = subTotal * disVal / 100;
+
+  let finalTotal = subTotal + gstAmt - disAmt;
+
+  grandTotal.innerText = finalTotal.toFixed(2);
+}
+
+gst.oninput = calculateTotal;
+discount.oninput = calculateTotal;
+
+/* PAYMENT METHOD */
+function togglePayment(){
+
+  qrSection.style.display = "none";
+  cardSection.style.display = "none";
+  pinSection.style.display = "none";
+
+  if(paymentType.value === "UPI"){
+    qrSection.style.display = "block";
+  }
+
+  if(paymentType.value === "Card"){
+    cardSection.style.display = "block";
+  }
+}
+
+/* SAVE BILL */
+function saveBill(){
+
+  if(items.length === 0){
+
+    alert("Add items first");
+
+    return;
+  }
+
+  if(cname.value === "" || cmobile.value.length !== 10){
+
+    alert("Enter customer details");
+
+    return;
+  }
+
+  if(paymentType.value === "Card"){
+
+    pinSection.style.display = "block";
+
+    return;
+  }
+
+  completePayment();
+}
+
+/* CONFIRM CARD PAYMENT */
+function confirmPayment(){
+
+  if(pin.value.length !== 4){
+
+    alert("Enter valid PIN");
+
+    return;
+  }
+
+  completePayment();
+}
+
+/* COMPLETE PAYMENT */
+function completePayment(){
+
+  let billData = {
+
+    invoice: invoiceNo.innerText,
+
+    dateTime: new Date().toLocaleString(),
+
+    cname: cname.value,
+
+    cmobile: cmobile.value,
+
+    items: items,
+
+    total: grandTotal.innerText,
+
+    paymentType: paymentType.value
+  };
+
+  localStorage.setItem(
+    "billData",
+    JSON.stringify(billData)
+  );
+
+  localStorage.setItem(
+    "invoiceNo",
+    Number(invoiceNo.innerText) + 1
+  );
+
+  alert("Payment Successful ✅");
+
+  window.location.href = "e_invoice.html";
+}
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="c-_product.css">
+<title>Product Management</title>
+
+</style>
+</head>
+
+<body onload="loadProduct()">
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <h2>🛒 Grocery</h2>
+
+  <ul>
+
+    <li onclick="go('b_dashboard.html')">Dashboard</li>
+    <li onclick="go('c_product.html')">Product</li>
+    <li onclick="go('d_billing.html')">Billing</li>
+    <li onclick="go('e_invoice.html')">Invoice</li>
+    <li onclick="go('f_history.html')">History</li>
+    <li onclick="go('g_report.html')">Report</li>
+    <li onclick="logout()">Logout</li>
+  </ul>
+  
+
+  <button onclick="toggleMode()">🌙 Dark Mode</button>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+<h1>📦 Product Management</h1>
+
+<!-- ADD PRODUCT -->
+<div class="card">
+  <h3>Add Product</h3>
+  <br>
+
+  <div class="form-group">
+    <input type="text" id="pname" placeholder="Product Name">
+    <input type="number" id="pprice" placeholder="Price">
+    <input type="number" id="pqty" placeholder="Quantity">
+    <button onclick="addProduct()">Add Product</button>
+  </div>
+</div>
+
+<!-- PRODUCT LIST -->
+<div class="card">
+  <h3>Product List</h3>
+  <br>
+
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>Product Name</th>
+          <th>Price (₹)</th>
+          <th>Quantity</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+
+      <tbody id="productTable"></tbody>
+    </table>
+  </div>
+</div>
+
+</div>
+
+<script>
+function go(page){
+  window.location.href = page;
+}
+
+/* LOAD PRODUCTS */
+function loadProduct(){
+  let products = JSON.parse(localStorage.getItem("product")) || [];
+  let table = document.getElementById("productTable");
+
+  table.innerHTML = "";
+
+  products.forEach((p,index)=>{
+    let row = table.insertRow();
+
+    row.insertCell(0).innerHTML = p.name;
+    row.insertCell(1).innerHTML = "₹" + p.price;
+    row.insertCell(2).innerHTML = p.qty;
+
+    row.insertCell(3).innerHTML =
+      `<button class="delete-btn" onclick="deleteProduct(${index})">Delete</button>`;
+  });
+}
+
+/* ADD PRODUCT */
+function addProduct(){
+
+  let name = document.getElementById("pname").value.trim();
+  let price = document.getElementById("pprice").value;
+  let qty = document.getElementById("pqty").value;
+
+  if(name === "" || price === "" || qty === ""){
+    alert("Please fill all fields");
+    return;
+  }
+
+  let products = JSON.parse(localStorage.getItem("product")) || [];
+
+  products.push({
+    name:name,
+    price:price,
+    qty:qty
+  });
+
+  localStorage.setItem("product", JSON.stringify(products));
+
+  document.getElementById("pname").value = "";
+  document.getElementById("pprice").value = "";
+  document.getElementById("pqty").value = "";
+
+  loadProduct();
+}
+
+/* DELETE PRODUCT */
+function deleteProduct(index){
+
+  let products = JSON.parse(localStorage.getItem("product")) || [];
+
+  if(confirm("Delete this product?")){
+    products.splice(index,1);
+    localStorage.setItem("product", JSON.stringify(products));
+    loadProduct();
+  }
+}
+
+/* LOGOUT */
+function logout(){
+
+  if(confirm("Are you sure to logout?")){
+    localStorage.clear();
+    alert("Logged out successfully");
+    window.location.href = "a_login.html";
+  }
+}
+
+/* DARK MODE */
+function toggleMode(){
+  document.body.classList.toggle("dark-mode");
+}
+</script>
+
+</body>
+</html>

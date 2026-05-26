@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+  <title>Bill History</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <link rel="stylesheet" href="f-_history.css">
+
+</head>
+
+<body onload="loadHistory()">
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+
+  <h2>🛒 Grocery</h2>
+
+  <ul>
+    <li onclick="go('b_dashboard.html')">Dashboard</li>
+
+    <li onclick="go('c_product.html')">Product</li>
+
+    <li onclick="go('d_billing.html')">Billing</li>
+
+    <li onclick="go('e_invoice.html')">Invoice</li>
+
+    <!-- FIXED HISTORY PAGE -->
+    <li onclick="go('f_history.html')">History</li>
+
+    <li onclick="go('g_report.html')">Report</li>
+
+    <li onclick="logout()">Logout</li>
+  </ul>
+
+  <button onclick="toggleMode()" class="mode-btn">
+    🌙 Dark Mode
+  </button>
+
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="main">
+
+  <h2>🧾 Bill History</h2>
+
+  <div id="historyContainer"></div>
+
+</div>
+
+<script>
+
+/* PAGE NAVIGATION */
+function go(page){
+  window.location.href = page;
+}
+
+/* LOAD BILL HISTORY */
+function loadHistory(){
+
+  let bills =
+  JSON.parse(localStorage.getItem("bills")) || [];
+
+  let container =
+  document.getElementById("historyContainer");
+
+  container.innerHTML = "";
+
+  /* NO BILLS */
+  if(bills.length === 0){
+
+    container.innerHTML =
+    "<p>No bills found</p>";
+
+    return;
+  }
+
+  /* DISPLAY BILLS */
+  bills.forEach((bill,index)=>{
+
+    let div = document.createElement("div");
+
+    div.className = "card";
+
+    let itemsHTML = "";
+
+    /* ITEMS */
+    if(bill.items){
+
+      bill.items.forEach(item=>{
+
+        itemsHTML += `
+        <p>
+          ${item.name}
+          - ₹${item.price}
+          × ${item.qty}
+        </p>
+        `;
+      });
+    }
+
+    /* TOTAL CALCULATION */
+    let total = 0;
+
+    if(bill.items){
+
+      bill.items.forEach(item=>{
+        total += item.total;
+      });
+    }
+
+    div.innerHTML = `
+
+      <h3>Bill #${index+1}</h3>
+
+      <p>
+        <b>Date:</b>
+        ${bill.dateTime || "N/A"}
+      </p>
+
+      <p>
+        <b>Customer:</b>
+        ${bill.cname || "N/A"}
+      </p>
+
+      <p>
+        <b>Mobile:</b>
+        ${bill.cmobile || "N/A"}
+      </p>
+
+      ${itemsHTML}
+
+      <h4>Total: ₹${total}</h4>
+
+      <p>
+        <b>Payment:</b>
+        ${bill.paymentType || "Cash"}
+      </p>
+
+      <button onclick="deleteBill(${index})">
+        Delete
+      </button>
+    `;
+
+    container.appendChild(div);
+
+  });
+}
+
+/* DELETE BILL */
+function deleteBill(index){
+
+  let bills =
+  JSON.parse(localStorage.getItem("bills")) || [];
+
+  bills.splice(index,1);
+
+  localStorage.setItem(
+    "bills",
+    JSON.stringify(bills)
+  );
+
+  loadHistory();
+}
+
+/* LOGOUT */
+function logout(){
+
+  alert("Logged out successfully");
+
+  localStorage.clear();
+
+  window.location.href = "a_login.html";
+}
+
+/* DARK MODE */
+function toggleMode(){
+
+  document.body.classList.toggle("dark-mode");
+}
+
+</script>
+
+</body>
+</html>
