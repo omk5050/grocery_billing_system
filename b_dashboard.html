@@ -4,10 +4,8 @@
 <title>Grocery Dashboard</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<!-- Bootstrap CDN -->
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
-<link rel="stylesheet" href="b-_dashboard.css">
+<link rel="stylesheet" href="style.css">
 </head>
 
 <body>
@@ -17,7 +15,7 @@
   <h2>🛒 Grocery</h2>
 
   <ul>
-    <li onclick="go('a_login.html')">Dashboard</li>
+    <li onclick="go('b_dashboard.html')">Dashboard</li>
 
     <li onclick="go('c_product.html')">Products</li>
 
@@ -32,7 +30,7 @@
     <li onclick="logout()">Logout</li>
   </ul>
 
-  <button onclick="toggleMode()" class="btn btn-dark w-100 mt-3">
+  <button onclick="toggleMode()" class="dark-btn">
     🌙 Dark Mode
   </button>
 </div>
@@ -42,39 +40,27 @@
 
   <h1 class="mb-4">📊 Dashboard</h1>
 
-  <!-- Bootstrap Grid -->
-  <div class="row g-3">
-
-    <div class="col-md-3 col-sm-6">
-      <div class="card blue text-center">
-        <h5>Total Product</h5>
-        <h3>45</h3>
-      </div>
+  <div class="cards">
+    <div class="card">
+      <h3>Total Product</h3>
+      <p id="totalProduct">45</p>
     </div>
 
-    <div class="col-md-3 col-sm-6">
-      <div class="card green text-center">
-        <h5>Total Sales</h5>
-        <h3>₹12,500</h3>
-      </div>
+    <div class="card">
+      <h3>Total Sales</h3>
+      <p id="totalSales">₹12,500</p>
     </div>
 
-    <div class="col-md-3 col-sm-6">
-      <div class="card orange text-center">
-        <h5>Today's Bills</h5>
-        <h3>18</h3>
-      </div>
+    <div class="card">
+      <h3>Today's Bills</h3>
+      <p id="todayBills">18</p>
     </div>
 
-    <div class="col-md-3 col-sm-6">
-      <div class="card red text-center">
-        <h5>Low Stock</h5>
-        <h3>3 Items</h3>
-      </div>
+    <div class="card">
+      <h3>Low Stock</h3>
+      <p>3</p>
     </div>
-
   </div>
-
 </div>
 
 <script>
@@ -89,8 +75,7 @@ function logout(){
 
 /* Dark Mode */
 function toggleMode(){
-  document.body.classList.toggle("bg-dark");
-  document.body.classList.toggle("text-white");
+  document.body.classList.toggle("dark-mode");
 }
 
 </script>
