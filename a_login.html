@@ -22,24 +22,29 @@
     </div>
 
     <script>
-
-        function login() {
-
+        async function login() {
             let username = document.getElementById("user").value;
             let password = document.getElementById("pass").value;
 
-            if (username === "admin" && password === "123") {
-
-                window.location.href = "b_dashboard.html";
-
-            } else {
-
-                alert("Invalid Login");
-
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    window.location.href = "b_dashboard.html";
+                } else {
+                    alert(data.message || "Invalid Login");
+                }
+            } catch (error) {
+                console.error("Login error:", error);
+                alert("Error connecting to server. Make sure you access the site via the Render URL, not Live Server.");
             }
-
         }
-
     </script>
 
 </body>
