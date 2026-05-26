@@ -324,7 +324,9 @@ async function completePayment(){
     cmobile: cmobile.value,
     items: items,
     total: Number(grandTotal.innerText),
-    paymentType: paymentType.value
+    paymentType: paymentType.value,
+    gst: Number(gst.value),
+    discount: Number(discount.value)
   };
 
   try {
