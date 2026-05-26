@@ -57,111 +57,86 @@ function go(page){
 }
 
 /* LOAD BILL HISTORY */
-function loadHistory(){
+async function loadHistory(){
 
-  let bills =
-  JSON.parse(localStorage.getItem("bills")) || [];
+  let container = document.getElementById("historyContainer");
+  container.innerHTML = "<p>Loading bills...</p>";
 
-  let container =
-  document.getElementById("historyContainer");
+  try {
+    const response = await fetch('/api/invoices');
+    const bills = await response.json();
 
-  container.innerHTML = "";
+    container.innerHTML = "";
 
-  /* NO BILLS */
-  if(bills.length === 0){
+    /* NO BILLS */
+    if(bills.length === 0){
+      container.innerHTML = "<p>No bills found</p>";
+      return;
+    }
 
-    container.innerHTML =
-    "<p>No bills found</p>";
+    /* DISPLAY BILLS */
+    bills.forEach((bill,index)=>{
+      let div = document.createElement("div");
+      div.className = "card";
+      let itemsHTML = "";
 
-    return;
+      /* ITEMS */
+      if(bill.items){
+        bill.items.forEach(item=>{
+          itemsHTML += `
+          <p>
+            ${item.name}
+            - ₹${item.price}
+            × ${item.qty}
+          </p>
+          `;
+        });
+      }
+
+      /* TOTAL CALCULATION */
+      let total = 0;
+      if(bill.items){
+        bill.items.forEach(item=>{
+          total += item.total;
+        });
+      }
+
+      div.innerHTML = `
+        <h3>Bill #${bill.invoice || (index+1)}</h3>
+        <p><b>Date:</b> ${bill.dateTime || new Date(bill.createdAt).toLocaleString()}</p>
+        <p><b>Customer:</b> ${bill.cname || "N/A"}</p>
+        <p><b>Mobile:</b> ${bill.cmobile || "N/A"}</p>
+        ${itemsHTML}
+        <h4>Total: ₹${bill.total || total}</h4>
+        <p><b>Payment:</b> ${bill.paymentType || "Cash"}</p>
+        <button onclick="deleteBill('${bill._id}')">Delete</button>
+      `;
+
+      container.appendChild(div);
+    });
+  } catch (error) {
+    console.error("Error fetching bills:", error);
+    container.innerHTML = "<p>Error loading bills</p>";
   }
-
-  /* DISPLAY BILLS */
-  bills.forEach((bill,index)=>{
-
-    let div = document.createElement("div");
-
-    div.className = "card";
-
-    let itemsHTML = "";
-
-    /* ITEMS */
-    if(bill.items){
-
-      bill.items.forEach(item=>{
-
-        itemsHTML += `
-        <p>
-          ${item.name}
-          - ₹${item.price}
-          × ${item.qty}
-        </p>
-        `;
-      });
-    }
-
-    /* TOTAL CALCULATION */
-    let total = 0;
-
-    if(bill.items){
-
-      bill.items.forEach(item=>{
-        total += item.total;
-      });
-    }
-
-    div.innerHTML = `
-
-      <h3>Bill #${index+1}</h3>
-
-      <p>
-        <b>Date:</b>
-        ${bill.dateTime || "N/A"}
-      </p>
-
-      <p>
-        <b>Customer:</b>
-        ${bill.cname || "N/A"}
-      </p>
-
-      <p>
-        <b>Mobile:</b>
-        ${bill.cmobile || "N/A"}
-      </p>
-
-      ${itemsHTML}
-
-      <h4>Total: ₹${total}</h4>
-
-      <p>
-        <b>Payment:</b>
-        ${bill.paymentType || "Cash"}
-      </p>
-
-      <button onclick="deleteBill(${index})">
-        Delete
-      </button>
-    `;
-
-    container.appendChild(div);
-
-  });
 }
 
 /* DELETE BILL */
-function deleteBill(index){
-
-  let bills =
-  JSON.parse(localStorage.getItem("bills")) || [];
-
-  bills.splice(index,1);
-
-  localStorage.setItem(
-    "bills",
-    JSON.stringify(bills)
-  );
-
-  loadHistory();
+async function deleteBill(id){
+  if (confirm("Are you sure you want to delete this bill?")) {
+    try {
+      const response = await fetch(`/api/invoices/${id}`, {
+        method: 'DELETE'
+      });
+      if (response.ok) {
+        loadHistory();
+      } else {
+        alert("Failed to delete bill");
+      }
+    } catch (error) {
+      console.error("Error deleting bill:", error);
+      alert("Error connecting to server");
+    }
+  }
 }
 
 /* LOGOUT */

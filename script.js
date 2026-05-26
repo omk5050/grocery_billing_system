@@ -1,178 +1,116 @@
-let product= JSON.parse(localStorage.getItem("product")) || [];
+const API_BASE = '/api';
+
 let bill = [];
 
-function login(){
-
-let u=document.getElementById("username").value;
-let p=document.getElementById("password").value;
-
-if(u=="admin" && p=="123"){
-window.location="b_dashboard.html";
-}else{
-alert("Invalid Login");
-}
-
-}
-
+// Navigation functions
 function go(page){
-window.location=page;
+    window.location=page;
 }
 
 function logout(){
-window.location="a_login.html";
+    window.location="a_login.html";
 }
 
-function addProduct(){
-
-let name=document.getElementById("pname").value;
-let price=document.getElementById("pprice").value;
-
-products.push({name,price});
-
-localStorage.setItem("product",JSON.stringify(product));
-
-loadProduct();
+function goDashboard(){
+    window.location.href="b_dashboard.html";
 }
 
-function loadProduct(){
+// Product functions
+async function addProduct(){
+    let name = document.getElementById("pname").value;
+    let price = document.getElementById("pprice").value;
 
-let table=document.getElementById("productTable");
-
-table.innerHTML="";
-
-products.forEach(p=>{
-table.innerHTML+=`<tr>
-<td>${p.name}</td>
-<td>${p.price}</td>
-</tr>`;
-});
-
+    try {
+        const response = await fetch(`${API_BASE}/products`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, price: Number(price) })
+        });
+        if (response.ok) {
+            document.getElementById("pname").value = '';
+            document.getElementById("pprice").value = '';
+            loadProduct();
+        } else {
+            alert('Failed to add product');
+        }
+    } catch (error) {
+        console.error('Error adding product:', error);
+    }
 }
 
-function loadProductForBilling(){
+async function loadProduct(){
+    let table = document.getElementById("productTable");
+    if (!table) return; // Prevent errors on pages without this table
 
-let table=document.getElementById("billingProduct");
-
-table.innerHTML="";
-
-products.forEach(p=>{
-
-table.innerHTML+=`<tr>
-<td>${p.name}</td>
-<td>${p.price}</td>
-<td><button onclick="addToBill('${p.name}',${p.price})">Add</button></td>
-</tr>`;
-
-});
-
+    try {
+        const response = await fetch(`${API_BASE}/products`);
+        const products = await response.json();
+        
+        table.innerHTML="";
+        products.forEach(p => {
+            table.innerHTML += `<tr>
+            <td>${p.name}</td>
+            <td>${p.price}</td>
+            </tr>`;
+        });
+    } catch (error) {
+        console.error('Error loading products:', error);
+    }
 }
 
-function addToBill(name,price){
+async function loadProductForBilling(){
+    let table = document.getElementById("billingProduct");
+    if (!table) return;
 
-let found=bill.find(p=>p.name==name);
+    try {
+        const response = await fetch(`${API_BASE}/products`);
+        const products = await response.json();
 
-if(found){
-found.qty++;
-found.total=found.qty*price;
-}else{
-bill.push({name,price,qty:1,total:price});
+        table.innerHTML="";
+        products.forEach(p => {
+            table.innerHTML += `<tr>
+            <td>${p.name}</td>
+            <td>${p.price}</td>
+            <td><button onclick="addToBill('${p.name}',${p.price})">Add</button></td>
+            </tr>`;
+        });
+    } catch (error) {
+        console.error('Error loading products for billing:', error);
+    }
 }
 
-renderBill();
+// Billing functions
+function addToBill(name, price){
+    let found = bill.find(p => p.name == name);
+    if (found) {
+        found.qty++;
+        found.total = found.qty * price;
+    } else {
+        bill.push({name, price, qty: 1, total: price});
+    }
+    renderBill();
 }
 
 function renderBill(){
+    let table = document.getElementById("billTable");
+    if (!table) return;
 
-let table=document.getElementById("billTable");
+    table.innerHTML="";
+    let total = 0;
+    bill.forEach(p => {
+        table.innerHTML += `<tr>
+        <td>${p.name}</td>
+        <td>${p.price}</td>
+        <td>${p.qty}</td>
+        <td>${p.total}</td>
+        </tr>`;
+        total += p.total;
+    });
+    document.getElementById("total").innerText = total;
+}
 
-table.innerHTML="";
-
-let total=0;
-
-bill.forEach(p=>{
-
-table.innerHTML+=`<tr>
-<td>${p.name}</td>
-<td>${p.price}</td>
-<td>${p.qty}</td>
-<td>${p.total}</td>
-</tr>`;
-
-total+=p.total;
-
+// Call load functions on page load based on what elements exist
+document.addEventListener('DOMContentLoaded', () => {
+    loadProduct();
+    loadProductForBilling();
 });
-
-document.getElementById("total").innerText=total;
-}
-
-function generateInvoice(){
-
-let cname=document.getElementById("customerName").value;
-let mobile = cmobile.value.trim();
-
-if(!/^\d+$/.test(mobile)){
-  alert("Mobile number should contain only digits");
-  return;
-}
-
-if(mobile.length !== 10){
-  alert("Mobile number must be exactly 10 digits");
-  return;
-}
-
-localStorage.setItem("invoiceCustomer",cname);
-localStorage.setItem("invoiceBill",JSON.stringify(bill));
-
-window.location="e_invoice.html";
-}
-function goDashboard(){
-    window.location.href="b_dashboard_html";
-}
-
-function loadInvoice(){
-
-let cname=localStorage.getItem("invoiceCustomer");
-let bill=JSON.parse(localStorage.getItem("invoiceBill"));
-
-document.getElementById("invCustomer").innerText=cname;
-
-let table=document.getElementById("invoiceTable");
-
-let total=0;
-
-bill.forEach(p=>{
-
-table.innerHTML+=`<tr>
-<td>${p.name}</td>
-<td>${p.price}</td>
-<td>${p.qty}</td>
-<td>${p.total}</td>
-</tr>`;
-
-total+=p.total;
-
-});
-
-document.getElementById("invoiceTotal").innerText=total;
-
-}
-
-function loadReports(){
-
-let report=document.getElementById("reportTable");
-
-let cname=localStorage.getItem("invoiceCustomer");
-let bill=JSON.parse(localStorage.getItem("invoiceBill"));
-
-let total=0;
-
-bill.forEach(p=>{
-total+=p.total;
-});
-
-report.innerHTML=`<tr>
-<td>${cname}</td>
-<td>${total}</td>
-</tr>`;
-
-}

@@ -137,9 +137,56 @@ let monthly = [5000,6000,7000,8000,9000,10000,11000];
 let chart;
 
 // INIT
-window.onload = function(){
+window.onload = async function(){
+  await loadRealData();
   showDaily();
-  calculateSummary();
+}
+
+// LOAD REAL DATA
+async function loadRealData() {
+  try {
+    const response = await fetch('/api/invoices');
+    const invoices = await response.json();
+    
+    // Simple calculation for today, this week, this month
+    let todayTotal = 0;
+    let weekTotal = 0;
+    let monthTotal = 0;
+
+    const now = new Date();
+    
+    invoices.forEach(inv => {
+      const invDate = new Date(inv.createdAt || inv.dateTime);
+      const amount = inv.total;
+      
+      // Today
+      if (invDate.toDateString() === now.toDateString()) {
+        todayTotal += amount;
+      }
+      
+      // Week (rough approximation: within last 7 days)
+      const diffTime = Math.abs(now - invDate);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+      if (diffDays <= 7) {
+        weekTotal += amount;
+      }
+      
+      // Month
+      if (invDate.getMonth() === now.getMonth() && invDate.getFullYear() === now.getFullYear()) {
+        monthTotal += amount;
+      }
+    });
+
+    document.getElementById("todaySales").innerText = "₹" + todayTotal.toFixed(2);
+    document.getElementById("weekSales").innerText = "₹" + weekTotal.toFixed(2);
+    document.getElementById("monthSales").innerText = "₹" + monthTotal.toFixed(2);
+
+    let growth = monthTotal ? ((weekTotal - (monthTotal/4)) / (monthTotal/4) * 100).toFixed(2) : 0;
+    document.getElementById("growth").innerText = growth + "%";
+
+  } catch (error) {
+    console.error("Error loading real data:", error);
+  }
 }
 
 // LOAD CHART
@@ -178,26 +225,6 @@ function showWeekly(){
 
 function showMonthly(){
   loadChart(monthly,"Monthly Sales");
-}
-
-// SUMMARY
-function calculateSummary(){
-
-  let today = daily[daily.length-1];
-
-  let week = weekly.reduce((a,b)=>a+b,0);
-
-  let month = monthly.reduce((a,b)=>a+b,0);
-
-  let growth = ((week - month/4) / (month/4) * 100).toFixed(2);
-
-  document.getElementById("todaySales").innerText = "₹" + today;
-
-  document.getElementById("weekSales").innerText = "₹" + week;
-
-  document.getElementById("monthSales").innerText = "₹" + month;
-
-  document.getElementById("growth").innerText = growth + "%";
 }
 
 // EXPORT PDF

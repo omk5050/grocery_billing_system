@@ -315,38 +315,39 @@ function confirmPayment(){
 }
 
 /* COMPLETE PAYMENT */
-function completePayment(){
+async function completePayment(){
 
   let billData = {
-
     invoice: invoiceNo.innerText,
-
     dateTime: new Date().toLocaleString(),
-
     cname: cname.value,
-
     cmobile: cmobile.value,
-
     items: items,
-
-    total: grandTotal.innerText,
-
+    total: Number(grandTotal.innerText),
     paymentType: paymentType.value
   };
 
-  localStorage.setItem(
-    "billData",
-    JSON.stringify(billData)
-  );
+  try {
+    const response = await fetch('/api/invoices', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(billData)
+    });
 
-  localStorage.setItem(
-    "invoiceNo",
-    Number(invoiceNo.innerText) + 1
-  );
+    if (response.ok) {
+      // Keep in localStorage for the invoice page to render easily
+      localStorage.setItem("billData", JSON.stringify(billData));
+      localStorage.setItem("invoiceNo", Number(invoiceNo.innerText) + 1);
 
-  alert("Payment Successful ✅");
-
-  window.location.href = "e_invoice.html";
+      alert("Payment Successful ✅");
+      window.location.href = "e_invoice.html";
+    } else {
+      alert("Failed to save bill to backend.");
+    }
+  } catch (error) {
+    console.error("Error saving bill:", error);
+    alert("Error connecting to server.");
+  }
 }
 
 </script>

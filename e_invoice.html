@@ -237,18 +237,7 @@ function downloadPDF(){
 
 /* SAVE HISTORY */
 function saveToHistory(){
-
-  let bills =
-  JSON.parse(localStorage.getItem("bills")) || [];
-
-  bills.push(data);
-
-  localStorage.setItem(
-    "bills",
-    JSON.stringify(bills)
-  );
-
-  alert("Saved to History");
+  alert("Invoice is automatically saved to the database.");
 }
 
 /* CLEAR BILL */
