@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="style.css">
+<title>Register Admin</title>
+</head>
+
+<body>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <h2>🛒 Grocery</h2>
+
+  <ul>
+    <li onclick="go('b_dashboard.html')">Dashboard</li>
+    <li onclick="go('c_product.html')">Product</li>
+    <li onclick="go('d_billing.html')">Billing</li>
+    <li onclick="go('f_history.html')">History</li>
+    <li onclick="go('h_register.html')">Register Admin</li>
+    <li onclick="logout()">Logout</li>
+  </ul>
+  
+  <button onclick="toggleMode()">🌙 Dark Mode</button>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+<h1>👤 Register Admin</h1>
+
+<!-- REGISTER FORM -->
+<div class="card" style="max-width: 500px; margin-top: 2rem;">
+  <h3>Register New Administrator</h3>
+  <br>
+
+  <div class="form-group">
+    <label for="regUsername" style="font-weight: 500; margin-bottom: 0.5rem; display: block;">Username</label>
+    <input type="text" id="regUsername" placeholder="Enter new username">
+
+    <label for="regPassword" style="font-weight: 500; margin-bottom: 0.5rem; display: block;">Password</label>
+    <input type="password" id="regPassword" placeholder="Enter password">
+
+    <label for="regConfirmPassword" style="font-weight: 500; margin-bottom: 0.5rem; display: block;">Confirm Password</label>
+    <input type="password" id="regConfirmPassword" placeholder="Confirm password">
+
+    <button onclick="registerAdmin()" style="width: 100%; margin-top: 1rem;">Register Admin</button>
+  </div>
+</div>
+
+</div>
+
+<script>
+/* ROUTE PROTECTION */
+if (localStorage.getItem("isLoggedIn") !== "true") {
+  window.location.href = "a_login.html";
+}
+
+function go(page){
+  window.location.href = page;
+}
+
+async function registerAdmin() {
+  const username = document.getElementById("regUsername").value.trim();
+  const password = document.getElementById("regPassword").value;
+  const confirmPassword = document.getElementById("regConfirmPassword").value;
+
+  if (username === "" || password === "" || confirmPassword === "") {
+    alert("Please fill all fields");
+    return;
+  }
+
+  if (password !== confirmPassword) {
+    alert("Passwords do not match");
+    return;
+  }
+
+  try {
+    const response = await fetch('/api/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+
+    const data = await response.json();
+
+    if (response.ok && data.success) {
+      alert("New administrator registered successfully! 🎉");
+      document.getElementById("regUsername").value = "";
+      document.getElementById("regPassword").value = "";
+      document.getElementById("regConfirmPassword").value = "";
+    } else {
+      alert(data.message || "Registration failed");
+    }
+  } catch (error) {
+    console.error("Registration error:", error);
+    alert("Error connecting to server");
+  }
+}
+
+/* LOGOUT */
+function logout(){
+  if(confirm("Are you sure to logout?")){
+    localStorage.clear();
+    alert("Logged out successfully");
+    window.location.href = "a_login.html";
+  }
+}
+
+/* DARK MODE */
+function toggleMode(){
+  document.body.classList.toggle("dark-mode");
+}
+</script>
+
+</body>
+</html>

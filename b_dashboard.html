@@ -22,9 +22,9 @@
 
     <li onclick="go('d_billing.html')">Billing</li>
 
-    <li onclick="go('e_invoice.html')">Invoice</li>
-
     <li onclick="go('f_history.html')">History</li>
+
+    <li onclick="go('h_register.html')">Register Admin</li>
     
     <li onclick="logout()">Logout</li>
   </ul>
@@ -101,6 +101,11 @@
 </div>
 
 <script>
+/* ROUTE PROTECTION */
+if (localStorage.getItem("isLoggedIn") !== "true") {
+  window.location.href = "a_login.html";
+}
+
 let dbProducts = [];
 let dbInvoices = [];
 let chart;

@@ -7,6 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
   /* Modal styling */
   .modal {
@@ -68,10 +69,10 @@
 
     <li onclick="go('d_billing.html')">Billing</li>
 
-    <li onclick="go('e_invoice.html')">Invoice</li>
-
     <!-- FIXED HISTORY PAGE -->
     <li onclick="go('f_history.html')">History</li>
+
+    <li onclick="go('h_register.html')">Register Admin</li>
 
     <li onclick="logout()">Logout</li>
   </ul>
@@ -96,12 +97,21 @@
   <div class="modal-content">
     <span class="close-btn" onclick="closeModal()">&times;</span>
     <div id="modalInvoiceContent"></div>
+    <div style="text-align: center; margin-top: 1.5rem; display: flex; gap: 10px; justify-content: center;">
+      <button onclick="printInvoiceModal()" style="background: #3498db;">Print Invoice</button>
+      <button onclick="downloadInvoicePDF()" style="background: #2ecc71;">Download Invoice</button>
+    </div>
   </div>
 </div>
 
 <script>
+/* ROUTE PROTECTION */
+if (localStorage.getItem("isLoggedIn") !== "true") {
+  window.location.href = "a_login.html";
+}
 
 let allBills = [];
+let activeInspectedIndex = null;
 
 /* PAGE NAVIGATION */
 function go(page){
@@ -163,6 +173,7 @@ async function loadHistory(){
 function inspectBill(index) {
   let bill = allBills[index];
   if (!bill) return;
+  activeInspectedIndex = index;
 
   let modal = document.getElementById("invoiceModal");
   let content = document.getElementById("modalInvoiceContent");
@@ -247,6 +258,170 @@ window.onclick = function(event) {
   if (event.target == modal) {
     modal.style.display = "none";
   }
+}
+
+/* PRINT INVOICE MODAL */
+function printInvoiceModal() {
+  let bill = allBills[activeInspectedIndex];
+  if (!bill) return;
+
+  let printWindow = window.open("", "_blank", "width=800,height=600");
+  
+  let itemsHTML = "";
+  let subtotal = 0;
+  if (bill.items) {
+    bill.items.forEach((item, idx) => {
+      let itemTotal = Number(item.total) || (Number(item.price) * Number(item.qty)) || 0;
+      subtotal += itemTotal;
+      itemsHTML += `
+        <tr>
+          <td style="padding: 8px; border-bottom: 1px solid #ddd;">${idx + 1}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #ddd;">${item.name}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #ddd;">₹${Number(item.price).toFixed(2)}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #ddd;">${item.qty}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #ddd;">₹${itemTotal.toFixed(2)}</td>
+        </tr>
+      `;
+    });
+  }
+
+  let gstPercent = Number(bill.gst) || 0;
+  let discPercent = Number(bill.discount) || 0;
+  let gstAmt = subtotal * gstPercent / 100;
+  let discAmt = subtotal * discPercent / 100;
+  let grandTotal = subtotal + gstAmt - discAmt;
+
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>Invoice #${bill.invoice || activeInspectedIndex + 1}</title>
+        <style>
+          body { font-family: 'Segoe UI', sans-serif; padding: 20px; color: #333; }
+          .receipt { max-width: 600px; margin: auto; border: 1px solid #ddd; padding: 20px; border-radius: 8px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th { background: #f4f4f4; padding: 8px; text-align: left; border-bottom: 2px solid #ddd; }
+          .total-section { text-align: right; margin-top: 20px; line-height: 1.6; }
+        </style>
+      </head>
+      <body>
+        <div class="receipt">
+          <div style="text-align: center; border-bottom: 2px solid #ddd; padding-bottom: 10px;">
+            <h2>Grocery Store</h2>
+            <small>Main Road, Solapur</small>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-top: 20px; font-size: 14px;">
+            <div>
+              <p><b>Invoice No:</b> ${bill.invoice || "N/A"}</p>
+              <p><b>Date:</b> ${bill.dateTime || new Date(bill.createdAt).toLocaleString()}</p>
+            </div>
+            <div style="text-align: right;">
+              <p><b>Customer:</b> ${bill.cname || "N/A"}</p>
+              <p><b>Mobile:</b> ${bill.cmobile || "N/A"}</p>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Item</th>
+                <th>Price</th>
+                <th>Qty</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHTML}
+            </tbody>
+          </table>
+          <div class="total-section">
+            <p>Sub Total: ₹${subtotal.toFixed(2)}</p>
+            <p>GST (${gstPercent}%): ₹${gstAmt.toFixed(2)}</p>
+            <p>Discount (${discPercent}%): ₹${discAmt.toFixed(2)}</p>
+            <h3 style="color: #10b981; font-size: 18px; margin-top: 10px;">Grand Total: ₹${grandTotal.toFixed(2)}</h3>
+            <p style="font-size: 13px; margin-top: 5px;"><b>Payment Method:</b> ${bill.paymentType || "Cash"}</p>
+          </div>
+        </div>
+        <script>
+          window.onload = function() {
+            window.print();
+            setTimeout(function() { window.close(); }, 500);
+          }
+        <\/script>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+}
+
+/* DOWNLOAD INVOICE PDF */
+function downloadInvoicePDF() {
+  let bill = allBills[activeInspectedIndex];
+  if (!bill) return;
+
+  const { jsPDF } = window.jspdf;
+  let doc = new jsPDF();
+  
+  doc.setFontSize(22);
+  doc.text("Grocery Store Invoice", 20, 20);
+  doc.setFontSize(10);
+  doc.text("Main Road, Solapur", 20, 26);
+  
+  doc.line(20, 30, 190, 30);
+  
+  doc.setFontSize(12);
+  doc.text("Invoice No: " + (bill.invoice || "N/A"), 20, 40);
+  doc.text("Date: " + (bill.dateTime || new Date(bill.createdAt).toLocaleString()), 20, 47);
+  
+  doc.text("Customer Name: " + (bill.cname || "N/A"), 120, 40);
+  doc.text("Mobile Number: " + (bill.cmobile || "N/A"), 120, 47);
+  
+  doc.line(20, 52, 190, 52);
+  
+  let y = 60;
+  doc.text("Item Name", 20, y);
+  doc.text("Price", 90, y);
+  doc.text("Qty", 130, y);
+  doc.text("Total", 160, y);
+  doc.line(20, y+2, 190, y+2);
+  y += 10;
+  
+  let subtotal = 0;
+  if (bill.items) {
+    bill.items.forEach(item => {
+      let itemTotal = Number(item.total) || (Number(item.price) * Number(item.qty)) || 0;
+      subtotal += itemTotal;
+      
+      doc.text(item.name, 20, y);
+      doc.text("₹" + Number(item.price).toFixed(2), 90, y);
+      doc.text(String(item.qty), 130, y);
+      doc.text("₹" + itemTotal.toFixed(2), 160, y);
+      y += 8;
+    });
+  }
+  
+  doc.line(20, y, 190, y);
+  y += 8;
+  
+  let gstPercent = Number(bill.gst) || 0;
+  let discPercent = Number(bill.discount) || 0;
+  let gstAmt = subtotal * gstPercent / 100;
+  let discAmt = subtotal * discPercent / 100;
+  let grandTotal = subtotal + gstAmt - discAmt;
+  
+  doc.text("Subtotal: ₹" + subtotal.toFixed(2), 130, y);
+  y += 6;
+  doc.text(`GST (${gstPercent}%): ₹` + gstAmt.toFixed(2), 130, y);
+  y += 6;
+  doc.text(`Discount (${discPercent}%): ₹` + discAmt.toFixed(2), 130, y);
+  y += 8;
+  
+  doc.setFontSize(14);
+  doc.text("Grand Total: ₹" + grandTotal.toFixed(2), 120, y);
+  y += 8;
+  doc.setFontSize(12);
+  doc.text("Payment Method: " + (bill.paymentType || "Cash"), 20, y);
+  
+  doc.save(`invoice_${bill.invoice || activeInspectedIndex + 1}.pdf`);
 }
 
 /* DELETE BILL */

@@ -67,6 +67,36 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+// Register a new admin
+app.post('/api/register', async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ success: false, message: 'Username and password are required' });
+  }
+
+  try {
+    const existingAdmin = await Admin.findOne({ username });
+    if (existingAdmin) {
+      return res.status(400).json({ success: false, message: 'Username already exists' });
+    }
+
+    const salt = crypto.randomBytes(16).toString('hex');
+    const hash = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
+
+    const newAdmin = new Admin({
+      username,
+      password: hash,
+      salt: salt
+    });
+    await newAdmin.save();
+
+    res.status(201).json({ success: true, message: 'Admin user registered successfully' });
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({ success: false, message: 'Server error during registration' });
+  }
+});
+
 // Get all products
 app.get('/api/products', async (req, res) => {
   try {

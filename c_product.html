@@ -20,8 +20,8 @@
     <li onclick="go('b_dashboard.html')">Dashboard</li>
     <li onclick="go('c_product.html')">Product</li>
     <li onclick="go('d_billing.html')">Billing</li>
-    <li onclick="go('e_invoice.html')">Invoice</li>
     <li onclick="go('f_history.html')">History</li>
+    <li onclick="go('h_register.html')">Register Admin</li>
     <li onclick="logout()">Logout</li>
   </ul>
   
@@ -71,6 +71,11 @@
 </div>
 
 <script>
+/* ROUTE PROTECTION */
+if (localStorage.getItem("isLoggedIn") !== "true") {
+  window.location.href = "a_login.html";
+}
+
 function go(page){
   window.location.href = page;
 }

@@ -21,8 +21,8 @@
     <li onclick="go('b_dashboard.html')">Dashboard</li>
     <li onclick="go('c_product.html')">Products</li>
     <li onclick="go('d_billing.html')">Billing</li>
-    <li onclick="go('e_invoice.html')">Invoice</li>
     <li onclick="go('f_history.html')">History</li>
+    <li onclick="go('h_register.html')">Register Admin</li>
     <li onclick="logout()">Logout</li>
   </ul>
 
@@ -169,6 +169,10 @@
 </div>
 
 <script>
+/* ROUTE PROTECTION */
+if (localStorage.getItem("isLoggedIn") !== "true") {
+  window.location.href = "a_login.html";
+}
 
 let items = [];
 let subTotal = 0;
@@ -217,10 +221,11 @@ function go(page){
 
 /* LOGOUT */
 function logout(){
-
-  alert("Logged out Successfully");
-
-  window.location.href = "a_login.html";
+  if(confirm("Are you sure to logout?")){
+    localStorage.clear();
+    alert("Logged out successfully");
+    window.location.href = "a_login.html";
+  }
 }
 
 /* DARK MODE */
