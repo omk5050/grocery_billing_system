@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <link rel="stylesheet" href="style.css">
+<script src="toast.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
@@ -47,7 +48,10 @@
 
     <div class="card">
       <h3>Total Sales</h3>
-      <p id="totalSales">₹0.00</p>
+      <p style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 0;">
+        <span id="totalSales">₹0.00</span>
+        <span id="salesGrowthBadge"></span>
+      </p>
     </div>
 
     <div class="card">
@@ -55,9 +59,12 @@
       <p id="todayBills">0</p>
     </div>
 
-    <div class="card">
+    <div class="card" style="position: relative;">
       <h3>Low Stock</h3>
-      <p id="lowStock">0</p>
+      <p style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 0;">
+        <span id="lowStock">0</span>
+        <span id="lowStockBadge" style="width: 10px; height: 10px; border-radius: 50%; background: #ef4444; display: none; animation: pulse 1.5s infinite;"></span>
+      </p>
     </div>
   </div>
 
@@ -125,12 +132,22 @@ async function loadDashboardData() {
     let lowStockCount = dbProducts.filter(p => p.qty < 5).length;
     document.getElementById("lowStock").innerText = lowStockCount;
 
+    // Toggle blinking red indicator for low stock
+    const stockBadge = document.getElementById("lowStockBadge");
+    if (lowStockCount > 0) {
+      stockBadge.style.display = "inline-block";
+    } else {
+      stockBadge.style.display = "none";
+    }
+
     // 2. Fetch Invoices
     const invRes = await fetch('/api/invoices');
     dbInvoices = await invRes.json();
 
     // Calculate Sales Metrics
     let todaySalesVal = 0;
+    let weekSalesVal = 0;
+    let lastWeekSalesVal = 0;
     let totalSalesVal = 0;
     let todayBillsCount = 0;
 
@@ -148,10 +165,36 @@ async function loadDashboardData() {
         todaySalesVal += amount;
         todayBillsCount++;
       }
+
+      // Last 7 days
+      const diffTime = Math.abs(now - invDate);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+      if (diffDays <= 7) {
+        weekSalesVal += amount;
+      }
+      
+      // Previous 7 days (days 8 to 14 ago)
+      if (diffDays > 7 && diffDays <= 14) {
+        lastWeekSalesVal += amount;
+      }
     });
 
     document.getElementById("totalSales").innerText = "₹" + totalSalesVal.toFixed(2);
     document.getElementById("todayBills").innerText = todayBillsCount;
+
+    // Generate Growth Badge
+    let growthHTML = "";
+    if (lastWeekSalesVal > 0) {
+      let percent = ((weekSalesVal - lastWeekSalesVal) / lastWeekSalesVal * 100);
+      if (percent >= 0) {
+        growthHTML = `<span style="font-size: 0.8rem; padding: 2px 6px; border-radius: 4px; background: rgba(16, 185, 129, 0.15); color: #10b981; font-weight: 600; margin-left: 8px;">+${percent.toFixed(0)}%</span>`;
+      } else {
+        growthHTML = `<span style="font-size: 0.8rem; padding: 2px 6px; border-radius: 4px; background: rgba(239, 68, 68, 0.15); color: #ef4444; font-weight: 600; margin-left: 8px;">${percent.toFixed(0)}%</span>`;
+      }
+    } else {
+      growthHTML = `<span style="font-size: 0.8rem; padding: 2px 6px; border-radius: 4px; background: rgba(16, 185, 129, 0.15); color: #10b981; font-weight: 600; margin-left: 8px;">+100%</span>`;
+    }
+    document.getElementById("salesGrowthBadge").innerHTML = growthHTML;
 
     // 3. Render Top Selling Products Table
     renderTopSellingProducts();
@@ -288,6 +331,11 @@ function getMonthlyChartData() {
 function loadChart(labels, data, label) {
   let ctx = document.getElementById('salesChart').getContext('2d');
   
+  // Create gradient background
+  let gradient = ctx.createLinearGradient(0, 0, 0, 300);
+  gradient.addColorStop(0, 'rgba(16, 185, 129, 0.35)');
+  gradient.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+
   if (chart) {
     chart.destroy();
   }
@@ -300,7 +348,7 @@ function loadChart(labels, data, label) {
         label: label,
         data: data,
         borderColor: '#10b981',
-        backgroundColor: 'rgba(16, 185, 129, 0.05)',
+        backgroundColor: gradient,
         borderWidth: 3,
         tension: 0.3,
         fill: true

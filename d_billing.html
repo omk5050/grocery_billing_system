@@ -7,6 +7,7 @@
 <title>Modern Billing Page</title>
 
 <link rel="stylesheet" href="style.css">
+<script src="toast.js"></script>
 
 </head>
 
@@ -58,7 +59,7 @@
 
   <input type="text" id="cname" placeholder="Customer Name">
 
-  <input type="number" id="cmobile" placeholder="Mobile Number">
+  <input type="number" id="cmobile" placeholder="Mobile Number" oninput="validateMobile()">
 
 </div>
 
@@ -198,12 +199,37 @@ async function initBilling() {
 
 initBilling();
 
-/* AUTO-POPULATE PRICE ON MATCH */
+/* AUTO-POPULATE PRICE ON MATCH & VALIDATION */
 function checkProductMatch() {
-  let nameVal = document.getElementById("pname").value.trim().toLowerCase();
+  let input = document.getElementById("pname");
+  let nameVal = input.value.trim().toLowerCase();
+  
+  if (nameVal === "") {
+    input.style.borderColor = "";
+    input.style.boxShadow = "";
+    return;
+  }
+
   let matchedProduct = dbProducts.find(p => p.name.toLowerCase() === nameVal);
   if (matchedProduct) {
     document.getElementById("price").value = matchedProduct.price;
+    input.style.borderColor = "#10b981";
+    input.style.boxShadow = "0 0 0 3px rgba(16, 185, 129, 0.2)";
+  } else {
+    input.style.borderColor = "";
+    input.style.boxShadow = "";
+  }
+}
+
+/* MOBILE LIVE VALIDATION */
+function validateMobile() {
+  const input = document.getElementById("cmobile");
+  if (input.value.length === 10) {
+    input.style.borderColor = "#10b981";
+    input.style.boxShadow = "0 0 0 3px rgba(16, 185, 129, 0.2)";
+  } else {
+    input.style.borderColor = "";
+    input.style.boxShadow = "";
   }
 }
 
@@ -220,8 +246,8 @@ function go(page){
 }
 
 /* LOGOUT */
-function logout(){
-  if(confirm("Are you sure to logout?")){
+async function logout(){
+  if(await showConfirm("Are you sure you want to logout?")){
     localStorage.clear();
     alert("Logged out successfully");
     window.location.href = "a_login.html";
@@ -310,39 +336,32 @@ function togglePayment(){
 }
 
 /* SAVE BILL */
-function saveBill(){
+async function saveBill(){
 
   if(items.length === 0){
-
     alert("Add items first");
-
     return;
   }
 
   if(cname.value === "" || cmobile.value.length !== 10){
-
     alert("Enter customer details");
-
     return;
   }
 
-  if(paymentType.value === "Card"){
-
-    pinSection.style.display = "block";
-
-    return;
+  if(await showConfirm(`Are you sure you want to save this bill for a total of ₹${grandTotal.innerText}?`)){
+    if(paymentType.value === "Card"){
+      pinSection.style.display = "block";
+      return;
+    }
+    completePayment();
   }
-
-  completePayment();
 }
 
 /* CONFIRM CARD PAYMENT */
 function confirmPayment(){
 
   if(pin.value.length !== 4){
-
     alert("Enter valid PIN");
-
     return;
   }
 
@@ -372,12 +391,12 @@ async function completePayment(){
     });
 
     if (response.ok) {
-      // Keep in localStorage for the invoice page to render easily
+      // Keep in localStorage for print/rendering if needed
       localStorage.setItem("billData", JSON.stringify(billData));
       localStorage.setItem("invoiceNo", Number(invoiceNo.innerText) + 1);
 
       alert("Payment Successful ✅");
-      window.location.href = "e_invoice.html";
+      window.location.href = "f_history.html";
     } else {
       alert("Failed to save bill to backend.");
     }

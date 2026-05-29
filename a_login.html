@@ -4,7 +4,9 @@
 <head>
     <title>Login</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="a-_login.css">
+    <script src="toast.js"></script>
 </head>
 
 <body>
@@ -18,9 +20,10 @@
             <input type="text" id="user">
         </div>
 
-        <div style="text-align: left; margin-bottom: 20px;">
+        <div style="text-align: left; margin-bottom: 20px; position: relative;">
             <label for="pass" style="color: #fff; font-size: 13px; font-weight: 500; display: block; margin-bottom: 5px; letter-spacing: 0.5px;">Password</label>
-            <input type="password" id="pass">
+            <input type="password" id="pass" style="padding-right: 40px;">
+            <span onclick="togglePasswordVisibility('pass')" style="position: absolute; right: 12px; bottom: 10px; cursor: pointer; color: rgba(255,255,255,0.7); font-size: 16px; user-select: none;" id="toggle-pass">👁️</span>
         </div>
 
         <button onclick="login()">Login</button>
@@ -28,6 +31,18 @@
     </div>
 
     <script>
+        function togglePasswordVisibility(id) {
+            const input = document.getElementById(id);
+            const eye = document.getElementById('toggle-' + id);
+            if (input.type === "password") {
+                input.type = "text";
+                eye.innerText = "🙈";
+            } else {
+                input.type = "password";
+                eye.innerText = "👁️";
+            }
+        }
+
         async function login() {
             let username = document.getElementById("user").value;
             let password = document.getElementById("pass").value;

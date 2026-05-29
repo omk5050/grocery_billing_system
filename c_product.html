@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" href="style.css">
+<script src="toast.js"></script>
 <title>Product Management</title>
 
 </style>
@@ -40,7 +41,7 @@
   <br>
 
   <div class="form-group">
-    <input type="text" id="pname" placeholder="Product Name">
+    <input type="text" id="pname" placeholder="Product Name" oninput="validateProductName()">
     <input type="number" id="pprice" placeholder="Price">
     <input type="number" id="pqty" placeholder="Quantity">
     <button onclick="addProduct()">Add Product</button>
@@ -78,6 +79,17 @@ if (localStorage.getItem("isLoggedIn") !== "true") {
 
 function go(page){
   window.location.href = page;
+}
+
+function validateProductName() {
+  const input = document.getElementById("pname");
+  if (input.value.trim() === "") {
+    input.style.borderColor = "#ef4444";
+    input.style.boxShadow = "0 0 0 3px rgba(239, 68, 68, 0.2)";
+  } else {
+    input.style.borderColor = "#10b981";
+    input.style.boxShadow = "0 0 0 3px rgba(16, 185, 129, 0.2)";
+  }
 }
 
 /* LOAD PRODUCTS */
@@ -145,7 +157,7 @@ async function addProduct(){
 
 /* DELETE PRODUCT */
 async function deleteProduct(id){
-  if(confirm("Delete this product?")){
+  if(await showConfirm("Are you sure you want to delete this product?")){
     try {
       const response = await fetch(`/api/products/${id}`, {
         method: 'DELETE'
@@ -163,9 +175,8 @@ async function deleteProduct(id){
 }
 
 /* LOGOUT */
-function logout(){
-
-  if(confirm("Are you sure to logout?")){
+async function logout(){
+  if(await showConfirm("Are you sure you want to logout?")){
     localStorage.clear();
     alert("Logged out successfully");
     window.location.href = "a_login.html";

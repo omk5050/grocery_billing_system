@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" href="style.css">
+<script src="toast.js"></script>
 <title>Register Admin</title>
 </head>
 
@@ -39,11 +40,17 @@
     <label for="regUsername" style="font-weight: 500; margin-bottom: 0.5rem; display: block;">Username</label>
     <input type="text" id="regUsername" placeholder="Enter new username">
 
-    <label for="regPassword" style="font-weight: 500; margin-bottom: 0.5rem; display: block;">Password</label>
-    <input type="password" id="regPassword" placeholder="Enter password">
+    <div style="position: relative; margin-bottom: 1rem;">
+      <label for="regPassword" style="font-weight: 500; margin-bottom: 0.5rem; display: block;">Password</label>
+      <input type="password" id="regPassword" placeholder="Enter password" style="padding-right: 40px; margin-bottom: 0;" oninput="validatePasswordMatch()">
+      <span onclick="togglePasswordVisibility('regPassword')" style="position: absolute; right: 12px; bottom: 10px; cursor: pointer; color: var(--text-muted); font-size: 16px; user-select: none;" id="toggle-regPassword">👁️</span>
+    </div>
 
-    <label for="regConfirmPassword" style="font-weight: 500; margin-bottom: 0.5rem; display: block;">Confirm Password</label>
-    <input type="password" id="regConfirmPassword" placeholder="Confirm password">
+    <div style="position: relative; margin-bottom: 1rem;">
+      <label for="regConfirmPassword" style="font-weight: 500; margin-bottom: 0.5rem; display: block;">Confirm Password</label>
+      <input type="password" id="regConfirmPassword" placeholder="Confirm password" style="padding-right: 40px; margin-bottom: 0;" oninput="validatePasswordMatch()">
+      <span onclick="togglePasswordVisibility('regConfirmPassword')" style="position: absolute; right: 12px; bottom: 10px; cursor: pointer; color: var(--text-muted); font-size: 16px; user-select: none;" id="toggle-regConfirmPassword">👁️</span>
+    </div>
 
     <button onclick="registerAdmin()" style="width: 100%; margin-top: 1rem;">Register Admin</button>
   </div>
@@ -55,6 +62,43 @@
 /* ROUTE PROTECTION */
 if (localStorage.getItem("isLoggedIn") !== "true") {
   window.location.href = "a_login.html";
+}
+
+function togglePasswordVisibility(id) {
+  const input = document.getElementById(id);
+  const eye = document.getElementById('toggle-' + id);
+  if (input.type === "password") {
+    input.type = "text";
+    eye.innerText = "🙈";
+  } else {
+    input.type = "password";
+    eye.innerText = "👁️";
+  }
+}
+
+function validatePasswordMatch() {
+  const password = document.getElementById("regPassword");
+  const confirmPassword = document.getElementById("regConfirmPassword");
+  
+  if (confirmPassword.value === "") {
+    password.style.borderColor = "";
+    password.style.boxShadow = "";
+    confirmPassword.style.borderColor = "";
+    confirmPassword.style.boxShadow = "";
+    return;
+  }
+  
+  if (password.value === confirmPassword.value) {
+    password.style.borderColor = "#10b981";
+    password.style.boxShadow = "0 0 0 3px rgba(16, 185, 129, 0.2)";
+    confirmPassword.style.borderColor = "#10b981";
+    confirmPassword.style.boxShadow = "0 0 0 3px rgba(16, 185, 129, 0.2)";
+  } else {
+    password.style.borderColor = "#ef4444";
+    password.style.boxShadow = "0 0 0 3px rgba(239, 68, 68, 0.2)";
+    confirmPassword.style.borderColor = "#ef4444";
+    confirmPassword.style.boxShadow = "0 0 0 3px rgba(239, 68, 68, 0.2)";
+  }
 }
 
 function go(page){
@@ -100,8 +144,8 @@ async function registerAdmin() {
 }
 
 /* LOGOUT */
-function logout(){
-  if(confirm("Are you sure to logout?")){
+async function logout(){
+  if(await showConfirm("Are you sure you want to logout?")){
     localStorage.clear();
     alert("Logged out successfully");
     window.location.href = "a_login.html";
