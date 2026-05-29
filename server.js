@@ -13,20 +13,57 @@ app.use(express.static(__dirname));
 // Models
 const Product = require('./models/Product');
 const Invoice = require('./models/Invoice');
+const Admin = require('./models/Admin');
+const crypto = require('crypto');
+
+// Seed admin user on startup if not exists
+const seedAdmin = async () => {
+  try {
+    const adminCount = await Admin.countDocuments();
+    if (adminCount === 0) {
+      const salt = crypto.randomBytes(16).toString('hex');
+      const hash = crypto.pbkdf2Sync('admin123', salt, 1000, 64, 'sha512').toString('hex');
+      
+      const defaultAdmin = new Admin({
+        username: 'groceryadmin',
+        password: hash,
+        salt: salt
+      });
+      await defaultAdmin.save();
+      console.log('Default admin user ("groceryadmin") seeded successfully');
+    }
+  } catch (error) {
+    console.error('Error seeding admin user:', error);
+  }
+};
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('Connected to MongoDB'))
+  .then(() => {
+    console.log('Connected to MongoDB');
+    seedAdmin();
+  })
   .catch(err => console.error('Could not connect to MongoDB:', err));
 
 
 // Login
-app.post('/api/login', (req, res) => {
+app.post('/api/login', async (req, res) => {
   const { username, password } = req.body;
-  if (username === 'admin' && password === '123') {
-    res.json({ success: true, message: 'Login successful' });
-  } else {
-    res.status(401).json({ success: false, message: 'Invalid Login' });
+  try {
+    const admin = await Admin.findOne({ username });
+    if (!admin) {
+      return res.status(401).json({ success: false, message: 'Invalid Login' });
+    }
+
+    const verifyHash = crypto.pbkdf2Sync(password, admin.salt, 1000, 64, 'sha512').toString('hex');
+    if (verifyHash === admin.password) {
+      res.json({ success: true, message: 'Login successful' });
+    } else {
+      res.status(401).json({ success: false, message: 'Invalid Login' });
+    }
+  } catch (error) {
+    console.error('Authentication error:', error);
+    res.status(500).json({ success: false, message: 'Server error during login' });
   }
 });
 

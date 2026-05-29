@@ -26,6 +26,14 @@ const invoiceSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
+  gst: {
+    type: Number,
+    default: 0
+  },
+  discount: {
+    type: Number,
+    default: 0
+  },
   paymentType: {
     type: String,
     default: "Cash"

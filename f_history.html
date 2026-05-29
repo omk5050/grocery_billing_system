@@ -7,6 +7,50 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="stylesheet" href="style.css">
+  <style>
+  /* Modal styling */
+  .modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+  }
+
+  .modal-content {
+    background-color: var(--surface);
+    margin: 8% auto;
+    padding: 2.5rem;
+    border: 1px solid var(--border);
+    width: 90%;
+    max-width: 650px;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    position: relative;
+    color: var(--text-main);
+  }
+
+  .close-btn {
+    color: var(--text-muted);
+    position: absolute;
+    top: 1rem;
+    right: 1.5rem;
+    font-size: 2.2rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: color 0.2s;
+    line-height: 1;
+  }
+
+  .close-btn:hover {
+    color: var(--text-main);
+  }
+  </style>
 
 </head>
 
@@ -47,7 +91,17 @@
 
 </div>
 
+<!-- Modal for Inspecting Invoice -->
+<div id="invoiceModal" class="modal">
+  <div class="modal-content">
+    <span class="close-btn" onclick="closeModal()">&times;</span>
+    <div id="modalInvoiceContent"></div>
+  </div>
+</div>
+
 <script>
+
+let allBills = [];
 
 /* PAGE NAVIGATION */
 function go(page){
@@ -62,40 +116,25 @@ async function loadHistory(){
 
   try {
     const response = await fetch('/api/invoices');
-    const bills = await response.json();
+    allBills = await response.json();
 
     container.innerHTML = "";
 
     /* NO BILLS */
-    if(bills.length === 0){
+    if(allBills.length === 0){
       container.innerHTML = "<p>No bills found</p>";
       return;
     }
 
     /* DISPLAY BILLS */
-    bills.forEach((bill,index)=>{
+    allBills.forEach((bill,index)=>{
       let div = document.createElement("div");
       div.className = "card";
-      let itemsHTML = "";
 
-      /* ITEMS */
-      if(bill.items){
-        bill.items.forEach(item=>{
-          itemsHTML += `
-          <p>
-            ${item.name}
-            - ₹${item.price}
-            × ${item.qty}
-          </p>
-          `;
-        });
-      }
-
-      /* TOTAL CALCULATION */
-      let total = 0;
-      if(bill.items){
-        bill.items.forEach(item=>{
-          total += item.total;
+      let total = Number(bill.total) || 0;
+      if (total === 0 && bill.items) {
+        bill.items.forEach(item => {
+          total += (Number(item.price) * Number(item.qty)) || 0;
         });
       }
 
@@ -104,10 +143,12 @@ async function loadHistory(){
         <p><b>Date:</b> ${bill.dateTime || new Date(bill.createdAt).toLocaleString()}</p>
         <p><b>Customer:</b> ${bill.cname || "N/A"}</p>
         <p><b>Mobile:</b> ${bill.cmobile || "N/A"}</p>
-        ${itemsHTML}
-        <h4>Total: ₹${bill.total || total}</h4>
+        <h4>Total: ₹${total.toFixed(2)}</h4>
         <p><b>Payment:</b> ${bill.paymentType || "Cash"}</p>
-        <button onclick="deleteBill('${bill._id}')">Delete</button>
+        <div style="display: flex; gap: 10px; margin-top: 15px;">
+          <button onclick="inspectBill(${index})" style="background: var(--primary);">Inspect</button>
+          <button onclick="deleteBill('${bill._id}')" style="background: #e74c3c;">Delete</button>
+        </div>
       `;
 
       container.appendChild(div);
@@ -115,6 +156,96 @@ async function loadHistory(){
   } catch (error) {
     console.error("Error fetching bills:", error);
     container.innerHTML = "<p>Error loading bills</p>";
+  }
+}
+
+/* INSPECT BILL DETAIL */
+function inspectBill(index) {
+  let bill = allBills[index];
+  if (!bill) return;
+
+  let modal = document.getElementById("invoiceModal");
+  let content = document.getElementById("modalInvoiceContent");
+
+  let itemsHTML = "";
+  let subtotal = 0;
+  
+  if (bill.items) {
+    bill.items.forEach((item, idx) => {
+      let itemTotal = Number(item.total) || (Number(item.price) * Number(item.qty)) || 0;
+      subtotal += itemTotal;
+      itemsHTML += `
+        <tr>
+          <td>${idx + 1}</td>
+          <td>${item.name}</td>
+          <td>₹${Number(item.price).toFixed(2)}</td>
+          <td>${item.qty}</td>
+          <td>₹${itemTotal.toFixed(2)}</td>
+        </tr>
+      `;
+    });
+  }
+
+  let gstPercent = Number(bill.gst) || 0;
+  let discPercent = Number(bill.discount) || 0;
+  let gstAmt = subtotal * gstPercent / 100;
+  let discAmt = subtotal * discPercent / 100;
+  let grandTotal = subtotal + gstAmt - discAmt;
+
+  content.innerHTML = `
+    <div style="text-align: center; margin-bottom: 1.5rem; border-bottom: 2px solid var(--border); padding-bottom: 1rem;">
+      <h2>Grocery Store</h2>
+      <small style="color: var(--text-muted)">Main Road, Solapur</small>
+    </div>
+    
+    <div style="display: flex; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 10px;">
+      <div>
+        <p><b>Invoice No:</b> ${bill.invoice || "N/A"}</p>
+        <p><b>Date:</b> ${bill.dateTime || new Date(bill.createdAt).toLocaleString()}</p>
+      </div>
+      <div style="text-align: right;">
+        <p><b>Customer:</b> ${bill.cname || "N/A"}</p>
+        <p><b>Mobile:</b> ${bill.cmobile || "N/A"}</p>
+      </div>
+    </div>
+
+    <div class="table-wrap" style="margin-bottom: 1.5rem;">
+      <table style="width: 100%;">
+        <thead>
+          <tr>
+            <th style="padding: 0.5rem 1rem;">#</th>
+            <th style="padding: 0.5rem 1rem;">Item</th>
+            <th style="padding: 0.5rem 1rem;">Price</th>
+            <th style="padding: 0.5rem 1rem;">Qty</th>
+            <th style="padding: 0.5rem 1rem;">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${itemsHTML || "<tr><td colspan='5' style='text-align:center;'>No items in this invoice</td></tr>"}
+        </tbody>
+      </table>
+    </div>
+
+    <div style="text-align: right; line-height: 1.8; border-top: 1px solid var(--border); padding-top: 1rem;">
+      <p>Sub Total: ₹${subtotal.toFixed(2)}</p>
+      <p>GST (${gstPercent}%): ₹${gstAmt.toFixed(2)}</p>
+      <p>Discount (${discPercent}%): ₹${discAmt.toFixed(2)}</p>
+      <h3 style="color: var(--primary); margin-top: 0.5rem; font-size: 1.5rem;">Grand Total: ₹${grandTotal.toFixed(2)}</h3>
+      <p style="margin-top: 0.5rem;"><b>Payment Method:</b> ${bill.paymentType || "Cash"}</p>
+    </div>
+  `;
+
+  modal.style.display = "block";
+}
+
+function closeModal() {
+  document.getElementById("invoiceModal").style.display = "none";
+}
+
+window.onclick = function(event) {
+  let modal = document.getElementById("invoiceModal");
+  if (event.target == modal) {
+    modal.style.display = "none";
   }
 }
 
