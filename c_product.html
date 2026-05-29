@@ -22,7 +22,6 @@
     <li onclick="go('d_billing.html')">Billing</li>
     <li onclick="go('e_invoice.html')">Invoice</li>
     <li onclick="go('f_history.html')">History</li>
-    <li onclick="go('g_report.html')">Report</li>
     <li onclick="logout()">Logout</li>
   </ul>
   
@@ -77,27 +76,38 @@ function go(page){
 }
 
 /* LOAD PRODUCTS */
-function loadProduct(){
-  let products = JSON.parse(localStorage.getItem("product")) || [];
+async function loadProduct(){
   let table = document.getElementById("productTable");
+  table.innerHTML = "<tr><td colspan='4' style='text-align:center;'>Loading products...</td></tr>";
 
-  table.innerHTML = "";
+  try {
+    const response = await fetch('/api/products');
+    const products = await response.json();
+    table.innerHTML = "";
 
-  products.forEach((p,index)=>{
-    let row = table.insertRow();
+    if (products.length === 0) {
+      table.innerHTML = "<tr><td colspan='4' style='text-align:center;'>No products found</td></tr>";
+      return;
+    }
 
-    row.insertCell(0).innerHTML = p.name;
-    row.insertCell(1).innerHTML = "₹" + p.price;
-    row.insertCell(2).innerHTML = p.qty;
+    products.forEach((p)=>{
+      let row = table.insertRow();
 
-    row.insertCell(3).innerHTML =
-      `<button class="delete-btn" onclick="deleteProduct(${index})">Delete</button>`;
-  });
+      row.insertCell(0).innerHTML = p.name;
+      row.insertCell(1).innerHTML = "₹" + p.price;
+      row.insertCell(2).innerHTML = p.qty;
+
+      row.insertCell(3).innerHTML =
+        `<button class="delete-btn" onclick="deleteProduct('${p._id}')">Delete</button>`;
+    });
+  } catch (error) {
+    console.error("Error loading products:", error);
+    table.innerHTML = "<tr><td colspan='4' style='text-align:center;'>Error loading products</td></tr>";
+  }
 }
 
 /* ADD PRODUCT */
-function addProduct(){
-
+async function addProduct(){
   let name = document.getElementById("pname").value.trim();
   let price = document.getElementById("pprice").value;
   let qty = document.getElementById("pqty").value;
@@ -107,32 +117,43 @@ function addProduct(){
     return;
   }
 
-  let products = JSON.parse(localStorage.getItem("product")) || [];
+  try {
+    const response = await fetch('/api/products', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, price: Number(price), qty: Number(qty) })
+    });
 
-  products.push({
-    name:name,
-    price:price,
-    qty:qty
-  });
-
-  localStorage.setItem("product", JSON.stringify(products));
-
-  document.getElementById("pname").value = "";
-  document.getElementById("pprice").value = "";
-  document.getElementById("pqty").value = "";
-
-  loadProduct();
+    if (response.ok) {
+      document.getElementById("pname").value = "";
+      document.getElementById("pprice").value = "";
+      document.getElementById("pqty").value = "";
+      loadProduct();
+    } else {
+      alert("Failed to add product");
+    }
+  } catch (error) {
+    console.error("Error adding product:", error);
+    alert("Error adding product");
+  }
 }
 
 /* DELETE PRODUCT */
-function deleteProduct(index){
-
-  let products = JSON.parse(localStorage.getItem("product")) || [];
-
+async function deleteProduct(id){
   if(confirm("Delete this product?")){
-    products.splice(index,1);
-    localStorage.setItem("product", JSON.stringify(products));
-    loadProduct();
+    try {
+      const response = await fetch(`/api/products/${id}`, {
+        method: 'DELETE'
+      });
+      if (response.ok) {
+        loadProduct();
+      } else {
+        alert("Failed to delete product");
+      }
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      alert("Error deleting product");
+    }
   }
 }
 

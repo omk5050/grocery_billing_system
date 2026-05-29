@@ -4,8 +4,9 @@
 <title>Grocery Dashboard</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-
 <link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 
 <body>
@@ -24,8 +25,6 @@
     <li onclick="go('e_invoice.html')">Invoice</li>
 
     <li onclick="go('f_history.html')">History</li>
-
-    <li onclick="go('g_report.html')">Report</li>
     
     <li onclick="logout()">Logout</li>
   </ul>
@@ -43,27 +42,379 @@
   <div class="cards">
     <div class="card">
       <h3>Total Product</h3>
-      <p id="totalProduct">45</p>
+      <p id="totalProduct">0</p>
     </div>
 
     <div class="card">
       <h3>Total Sales</h3>
-      <p id="totalSales">₹12,500</p>
+      <p id="totalSales">₹0.00</p>
     </div>
 
     <div class="card">
       <h3>Today's Bills</h3>
-      <p id="todayBills">18</p>
+      <p id="todayBills">0</p>
     </div>
 
     <div class="card">
       <h3>Low Stock</h3>
-      <p>3</p>
+      <p id="lowStock">0</p>
+    </div>
+  </div>
+
+  <!-- SALES ANALYTICS CHART -->
+  <div class="card">
+    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; border-bottom: none; padding: 0 0 1rem 0;">
+      <h3>Sales Analytics</h3>
+      <div class="dashboard-actions" style="display: flex; gap: 0.5rem; margin-bottom: 0;">
+        <button id="btnDaily" onclick="showDaily()">Daily</button>
+        <button id="btnWeekly" onclick="showWeekly()">Weekly</button>
+        <button id="btnMonthly" onclick="showMonthly()">Monthly</button>
+        <button onclick="exportPDF()" style="background: #3498db;">Export PDF</button>
+      </div>
+    </div>
+    <div style="height: 350px; position: relative;">
+      <canvas id="salesChart"></canvas>
+    </div>
+  </div>
+
+  <!-- TOP PRODUCTS TABLE -->
+  <div class="card">
+    <h3>Top Selling Products</h3>
+    <br>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Product Name</th>
+            <th>Quantity Sold</th>
+            <th>Total Revenue</th>
+          </tr>
+        </thead>
+        <tbody id="topProductsTable">
+          <tr>
+            <td colspan="3" style="text-align: center;">Loading top products...</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </div>
 </div>
 
 <script>
+let dbProducts = [];
+let dbInvoices = [];
+let chart;
+
+window.onload = async function() {
+  await loadDashboardData();
+}
+
+async function loadDashboardData() {
+  try {
+    // 1. Fetch Products
+    const prodRes = await fetch('/api/products');
+    dbProducts = await prodRes.json();
+    document.getElementById("totalProduct").innerText = dbProducts.length;
+    
+    // Calculate Low Stock (qty < 5)
+    let lowStockCount = dbProducts.filter(p => p.qty < 5).length;
+    document.getElementById("lowStock").innerText = lowStockCount;
+
+    // 2. Fetch Invoices
+    const invRes = await fetch('/api/invoices');
+    dbInvoices = await invRes.json();
+
+    // Calculate Sales Metrics
+    let todaySalesVal = 0;
+    let totalSalesVal = 0;
+    let todayBillsCount = 0;
+
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    dbInvoices.forEach(inv => {
+      const invDate = new Date(inv.createdAt || inv.dateTime);
+      const amount = Number(inv.total) || 0;
+
+      totalSalesVal += amount;
+
+      // Today
+      if (invDate >= todayStart) {
+        todaySalesVal += amount;
+        todayBillsCount++;
+      }
+    });
+
+    document.getElementById("totalSales").innerText = "₹" + totalSalesVal.toFixed(2);
+    document.getElementById("todayBills").innerText = todayBillsCount;
+
+    // 3. Render Top Selling Products Table
+    renderTopSellingProducts();
+
+    // 4. Render Chart
+    showDaily();
+
+  } catch (error) {
+    console.error("Error loading dashboard data:", error);
+  }
+}
+
+function renderTopSellingProducts() {
+  let productSales = {}; // { productName: { qty: 0, revenue: 0 } }
+  
+  dbInvoices.forEach(inv => {
+    if (inv.items) {
+      inv.items.forEach(item => {
+        let name = item.name;
+        let qty = Number(item.qty) || 0;
+        let total = Number(item.total) || (Number(item.price) * qty) || 0;
+        
+        if (!productSales[name]) {
+          productSales[name] = { qty: 0, revenue: 0 };
+        }
+        productSales[name].qty += qty;
+        productSales[name].revenue += total;
+      });
+    }
+  });
+
+  // Convert to array and sort by revenue
+  let sortedProducts = Object.keys(productSales).map(name => {
+    return {
+      name: name,
+      qty: productSales[name].qty,
+      revenue: productSales[name].revenue
+    };
+  }).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
+
+  let tbody = document.getElementById("topProductsTable");
+  tbody.innerHTML = "";
+
+  if (sortedProducts.length === 0) {
+    tbody.innerHTML = "<tr><td colspan='3' style='text-align:center;'>No sales recorded yet</td></tr>";
+    return;
+  }
+
+  sortedProducts.forEach(p => {
+    let row = tbody.insertRow();
+    row.insertCell(0).innerHTML = p.name;
+    row.insertCell(1).innerHTML = p.qty;
+    row.insertCell(2).innerHTML = "₹" + p.revenue.toFixed(2);
+  });
+}
+
+function getDailyChartData() {
+  // Last 7 days including today
+  let labels = [];
+  let data = [];
+  
+  for (let i = 6; i >= 0; i--) {
+    let d = new Date();
+    d.setDate(d.getDate() - i);
+    labels.push(d.toLocaleDateString(undefined, { weekday: 'short' }));
+    
+    let startOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    let endOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
+    
+    let dayTotal = 0;
+    dbInvoices.forEach(inv => {
+      let invDate = new Date(inv.createdAt || inv.dateTime);
+      if (invDate >= startOfDay && invDate < endOfDay) {
+        dayTotal += Number(inv.total) || 0;
+      }
+    });
+    data.push(dayTotal);
+  }
+  
+  return { labels, data };
+}
+
+function getWeeklyChartData() {
+  // Last 4 weeks
+  let labels = ["Week 4", "Week 3", "Week 2", "This Week"];
+  let data = [0, 0, 0, 0];
+  let now = new Date();
+  
+  dbInvoices.forEach(inv => {
+    let invDate = new Date(inv.createdAt || inv.dateTime);
+    let diffTime = Math.abs(now - invDate);
+    let diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays < 7) {
+      data[3] += Number(inv.total) || 0;
+    } else if (diffDays < 14) {
+      data[2] += Number(inv.total) || 0;
+    } else if (diffDays < 21) {
+      data[1] += Number(inv.total) || 0;
+    } else if (diffDays < 28) {
+      data[0] += Number(inv.total) || 0;
+    }
+  });
+  
+  return { labels, data };
+}
+
+function getMonthlyChartData() {
+  // Last 6 months
+  let labels = [];
+  let data = [];
+  let now = new Date();
+  
+  for (let i = 5; i >= 0; i--) {
+    let d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    labels.push(d.toLocaleDateString(undefined, { month: 'short', year: '2-digit' }));
+    
+    let month = d.getMonth();
+    let year = d.getFullYear();
+    
+    let monthTotal = 0;
+    dbInvoices.forEach(inv => {
+      let invDate = new Date(inv.createdAt || inv.dateTime);
+      if (invDate.getMonth() === month && invDate.getFullYear() === year) {
+        monthTotal += Number(inv.total) || 0;
+      }
+    });
+    data.push(monthTotal);
+  }
+  
+  return { labels, data };
+}
+
+function loadChart(labels, data, label) {
+  let ctx = document.getElementById('salesChart').getContext('2d');
+  
+  if (chart) {
+    chart.destroy();
+  }
+  
+  chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: label,
+        data: data,
+        borderColor: '#10b981',
+        backgroundColor: 'rgba(16, 185, 129, 0.05)',
+        borderWidth: 3,
+        tension: 0.3,
+        fill: true
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: {
+            color: document.body.classList.contains('dark-mode') ? '#f9fafb' : '#1f2937'
+          }
+        }
+      },
+      scales: {
+        y: {
+          grid: {
+            color: document.body.classList.contains('dark-mode') ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)'
+          },
+          ticks: {
+            color: document.body.classList.contains('dark-mode') ? '#9ca3af' : '#6b7280'
+          }
+        },
+        x: {
+          grid: {
+            color: document.body.classList.contains('dark-mode') ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)'
+          },
+          ticks: {
+            color: document.body.classList.contains('dark-mode') ? '#9ca3af' : '#6b7280'
+          }
+        }
+      }
+    }
+  });
+}
+
+function updateActiveButton(activeBtnId) {
+  const btnIds = ['btnDaily', 'btnWeekly', 'btnMonthly'];
+  btnIds.forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) {
+      if (id === activeBtnId) {
+        btn.style.background = 'var(--primary)';
+        btn.style.color = '#fff';
+        btn.style.borderColor = 'var(--primary)';
+      } else {
+        btn.style.background = 'transparent';
+        btn.style.color = 'var(--text-main)';
+        btn.style.borderColor = 'var(--border)';
+      }
+    }
+  });
+}
+
+function showDaily() {
+  updateActiveButton('btnDaily');
+  let chartData = getDailyChartData();
+  loadChart(chartData.labels, chartData.data, "Daily Sales (₹)");
+}
+
+function showWeekly() {
+  updateActiveButton('btnWeekly');
+  let chartData = getWeeklyChartData();
+  loadChart(chartData.labels, chartData.data, "Weekly Sales (₹)");
+}
+
+function showMonthly() {
+  updateActiveButton('btnMonthly');
+  let chartData = getMonthlyChartData();
+  loadChart(chartData.labels, chartData.data, "Monthly Sales (₹)");
+}
+
+function exportPDF() {
+  const { jsPDF } = window.jspdf;
+  let doc = new jsPDF();
+  
+  doc.setFontSize(22);
+  doc.text("Sales Report Dashboard", 20, 20);
+  
+  doc.setFontSize(12);
+  doc.text("Generated: " + new Date().toLocaleString(), 20, 30);
+  
+  doc.line(20, 35, 190, 35);
+  
+  doc.text("Total Products: " + document.getElementById("totalProduct").innerText, 20, 50);
+  doc.text("Total Sales: " + document.getElementById("totalSales").innerText, 20, 60);
+  doc.text("Today's Bills: " + document.getElementById("todayBills").innerText, 20, 70);
+  doc.text("Low Stock Products: " + document.getElementById("lowStock").innerText, 20, 80);
+  
+  doc.line(20, 90, 190, 90);
+  doc.setFontSize(14);
+  doc.text("Top Selling Products:", 20, 100);
+  
+  doc.setFontSize(12);
+  let y = 110;
+  let tbody = document.getElementById("topProductsTable");
+  let rows = tbody.getElementsByTagName("tr");
+  
+  if (rows.length === 0 || rows[0].cells.length < 3) {
+    doc.text("No sales recorded yet", 20, y);
+  } else {
+    doc.text("Product Name", 20, y);
+    doc.text("Qty Sold", 100, y);
+    doc.text("Revenue", 150, y);
+    doc.line(20, y+2, 190, y+2);
+    y += 10;
+    
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i].cells[0].innerText.includes("No sales recorded")) continue;
+      doc.text(rows[i].cells[0].innerText, 20, y);
+      doc.text(rows[i].cells[1].innerText, 100, y);
+      doc.text(rows[i].cells[2].innerText, 150, y);
+      y += 8;
+    }
+  }
+  
+  doc.save("sales_report.pdf");
+}
 
 function go(page){
   window.location.href = page;
@@ -73,11 +424,9 @@ function logout(){
   window.location.href="a_login.html";
 }
 
-/* Dark Mode */
 function toggleMode(){
   document.body.classList.toggle("dark-mode");
 }
-
 </script>
 
 </body>

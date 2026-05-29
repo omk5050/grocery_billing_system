@@ -19,7 +19,6 @@ mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('Connected to MongoDB'))
   .catch(err => console.error('Could not connect to MongoDB:', err));
 
-// --- API Routes ---
 
 // Login
 app.post('/api/login', (req, res) => {
@@ -44,12 +43,22 @@ app.get('/api/products', async (req, res) => {
 // Add a new product
 app.post('/api/products', async (req, res) => {
   try {
-    const { name, price } = req.body;
-    const newProduct = new Product({ name, price });
+    const { name, price, qty } = req.body;
+    const newProduct = new Product({ name, price: Number(price), qty: Number(qty) || 0 });
     await newProduct.save();
     res.status(201).json(newProduct);
   } catch (error) {
     res.status(500).json({ error: 'Failed to add product' });
+  }
+});
+
+// Delete a product
+app.delete('/api/products/:id', async (req, res) => {
+  try {
+    await Product.findByIdAndDelete(req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete product' });
   }
 });
 

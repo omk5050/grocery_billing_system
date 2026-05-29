@@ -23,7 +23,6 @@
     <li onclick="go('d_billing.html')">Billing</li>
     <li onclick="go('e_invoice.html')">Invoice</li>
     <li onclick="go('f_history.html')">History</li>
-    <li onclick="go('g_report.html')">Report</li>
     <li onclick="logout()">Logout</li>
   </ul>
 
@@ -68,7 +67,8 @@
 
   <h3>Add Product</h3>
 
-  <input type="text" id="pname" placeholder="Product Name">
+  <input type="text" id="pname" list="productSuggestions" placeholder="Product Name" oninput="checkProductMatch()">
+  <datalist id="productSuggestions"></datalist>
 
   <input type="number" id="price" placeholder="Price">
 
@@ -172,6 +172,36 @@
 
 let items = [];
 let subTotal = 0;
+let dbProducts = [];
+
+/* LOAD PRODUCT SUGGESTIONS FROM DB */
+async function initBilling() {
+  try {
+    const response = await fetch('/api/products');
+    dbProducts = await response.json();
+    
+    let datalist = document.getElementById("productSuggestions");
+    datalist.innerHTML = "";
+    dbProducts.forEach(p => {
+      let option = document.createElement("option");
+      option.value = p.name;
+      datalist.appendChild(option);
+    });
+  } catch (error) {
+    console.error("Error loading products for autocomplete:", error);
+  }
+}
+
+initBilling();
+
+/* AUTO-POPULATE PRICE ON MATCH */
+function checkProductMatch() {
+  let nameVal = document.getElementById("pname").value.trim().toLowerCase();
+  let matchedProduct = dbProducts.find(p => p.name.toLowerCase() === nameVal);
+  if (matchedProduct) {
+    document.getElementById("price").value = matchedProduct.price;
+  }
+}
 
 /* DATE & INVOICE */
 document.getElementById("dateTime").innerText =
