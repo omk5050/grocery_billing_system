@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scan Handwritten Bill</title>
+
+<link rel="stylesheet" href="style.css">
+<script src="toast.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- Tesseract.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+<style>
+/* Page Layout */
+.layout-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 1024px) {
+  .layout-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Dropzone Styling */
+.dropzone {
+  border: 2px dashed var(--border);
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 3rem 1.5rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  outline: none;
+}
+
+.dropzone:hover, .dropzone.dragover {
+  border-color: var(--primary);
+  background: rgba(16, 185, 129, 0.03);
+}
+
+.dropzone-icon {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+  transition: transform 0.2s ease;
+}
+
+.dropzone:hover .dropzone-icon {
+  transform: translateY(-5px);
+}
+
+/* Progress bar */
+.progress-bar-container {
+  width: 100%;
+  height: 8px;
+  background: var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 10px;
+}
+
+.progress-bar {
+  height: 100%;
+  background: var(--primary);
+  width: 0%;
+  transition: width 0.1s ease;
+}
+
+/* Spinner */
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Matches List */
+.match-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.match-item:hover, .match-item.active {
+  border-color: var(--primary);
+  background: rgba(16, 185, 129, 0.02);
+  transform: translateX(4px);
+}
+
+.match-badge {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.match-badge.high {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.match-badge.medium {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+.match-badge.low {
+  background: rgba(107, 114, 128, 0.15);
+  color: #6b7280;
+}
+
+/* Scanned details collapsable */
+details summary::-webkit-details-marker {
+  display: none;
+}
+</style>
+</head>
+
+<body>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <h2>🛒 Grocery</h2>
+  <ul>
+    <li onclick="go('b_dashboard.html')">Dashboard</li>
+    <li onclick="go('c_product.html')">Product</li>
+    <li onclick="go('d_billing.html')">Billing</li>
+    <li onclick="go('f_history.html')">History</li>
+    <li onclick="go('h_register.html')">Register Admin</li>
+    <li onclick="go('g_scan.html')" style="background: var(--sidebar-hover); color: #fff;">Scan Bill</li>
+    <li onclick="logout()">Logout</li>
+  </ul>
+  <button onclick="toggleMode()" class="mode-btn">🌙 Dark Mode</button>
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="main">
+  <h1 class="mb-4">🔍 Scan Bill</h1>
+
+  <div class="layout-grid">
+    
+    <!-- LEFT COLUMN: SCANNING AND UPLOADING -->
+    <div>
+      <div class="card">
+        <h3>Upload Handwritten Bill</h3>
+        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">
+          Upload a clear photograph or scan of a handwritten customer receipt. We will extract the text and search the database for a matching record.
+        </p>
+
+        <!-- Dropzone -->
+        <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()">
+          <div class="dropzone-icon">📤</div>
+          <p style="font-weight: 500; margin-bottom: 4px;">Drag & drop image here</p>
+          <p style="font-size: 0.85rem; color: var(--text-muted);">or click to browse files</p>
+          <input type="file" id="fileInput" accept="image/*" style="display: none;" onchange="handleFileSelect(event)">
+        </div>
+      </div>
+
+      <!-- OCR Status and Progress Card -->
+      <div id="ocrStatusCard" class="card" style="display: none;">
+        <h3>Scanning Image...</h3>
+        <p id="ocrStatusText" style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 0.75rem;">Initializing OCR engine...</p>
+        <div class="progress-bar-container">
+          <div id="ocrProgressBar" class="progress-bar" style="width: 0%;"></div>
+        </div>
+      </div>
+
+      <!-- Uploaded Image Preview Card -->
+      <div id="imagePreviewCard" class="card" style="display: none;">
+        <h3>Uploaded Bill Preview</h3>
+        <div style="text-align: center; margin-top: 1rem;">
+          <img id="previewImg" style="max-width: 100%; max-height: 250px; border-radius: 8px; border: 1px solid var(--border);" alt="Bill Preview" />
+        </div>
+      </div>
+
+      <!-- Debug extracted OCR text -->
+      <details id="ocrDebugDetails" class="card" style="display: none;">
+        <summary style="font-weight: 600; color: var(--text-main); list-style: none; display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+          <span>📄 Extracted OCR Text (Debug)</span>
+          <span style="font-size: 0.8rem; color: var(--primary);">View Extracted Text</span>
+        </summary>
+        <pre id="ocrDebugText" style="white-space: pre-wrap; font-family: monospace; font-size: 0.85rem; background: rgba(0,0,0,0.02); padding: 1rem; border-radius: 6px; border: 1px solid var(--border); margin-top: 1rem; color: var(--text-main); max-height: 200px; overflow-y: auto; text-align: left;"></pre>
+      </details>
+    </div>
+
+    <!-- RIGHT COLUMN: RESULTS & MATCH DETAIL -->
+    <div>
+      <div id="resultsCard" class="card" style="min-height: 400px;">
+        <h3>Database Match Results</h3>
+        <br>
+
+        <!-- Waiting State -->
+        <div id="waitingState" style="text-align: center; padding: 4rem 1rem;">
+          <div style="font-size: 3.5rem; margin-bottom: 1rem;">📄</div>
+          <h4 style="color: var(--text-muted); font-weight: 500;">Ready to Scan</h4>
+          <p style="color: var(--text-muted); font-size: 0.9rem; max-width: 320px; margin: 0 auto; line-height: 1.5;">
+            Once you upload a bill image, Tesseract OCR will read its contents and retrieve the matching database record.
+          </p>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loadingState" style="text-align: center; padding: 4rem 1rem; display: none;">
+          <div class="spinner"></div>
+          <h4 style="margin-top: 1.5rem; font-weight: 500;">Retrieving Invoices</h4>
+          <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.5rem;">Running matching algorithm against invoices...</p>
+        </div>
+
+        <!-- Matches list section -->
+        <div id="matchesList" style="display: none; margin-bottom: 1.5rem;">
+          <h4 style="font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 10px;">Multiple matches found</h4>
+          <div id="matchesContainer" style="display: flex; flex-direction: column; gap: 10px;"></div>
+        </div>
+
+        <!-- Single Best Match Details -->
+        <div id="matchedInvoiceDetail" style="display: none;">
+          <div id="invoicePreviewContent"></div>
+          
+          <div style="text-align: center; margin-top: 2rem; display: flex; gap: 10px; justify-content: center;">
+            <button id="btnPrintInvoice" style="background: #3498db;">Print Invoice</button>
+            <button id="btnDownloadPDF" style="background: #2ecc71;">Download Invoice</button>
+            <button id="btnResetScan" onclick="resetPage()" style="background: transparent; color: var(--text-muted); border: 1px solid var(--border);">Scan Another</button>
+          </div>
+        </div>
+
+        <!-- No Match State -->
+        <div id="noMatchState" style="text-align: center; padding: 4rem 1rem; display: none;">
+          <div style="font-size: 3rem; margin-bottom: 1rem;">⚠️</div>
+          <h4 style="color: var(--text-muted); font-weight: 500;">No Matching Invoice Found</h4>
+          <p style="color: var(--text-muted); font-size: 0.9rem; max-width: 320px; margin: 0 auto; line-height: 1.5;">
+            We couldn't confidently identify a matching invoice in the database. Ensure the image is clear and contains a name, phone, or items.
+          </p>
+          <button onclick="resetPage()" style="margin-top: 1.5rem; background: var(--primary);">Try Again</button>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ROUTE PROTECTION */
+if (localStorage.getItem("isLoggedIn") !== "true") {
+  window.location.href = "a_login.html";
+}
+
+let dbInvoices = [];
+let allScoredMatches = [];
+let activeMatchIndex = null;
+
+// Initialize dropzone drag & drop styling
+const dropzone = document.getElementById('dropzone');
+
+['dragenter', 'dragover'].forEach(eventName => {
+  dropzone.addEventListener(eventName, (e) => {
+    e.preventDefault();
+    dropzone.classList.add('dragover');
+  }, false);
+});
+
+['dragleave', 'drop'].forEach(eventName => {
+  dropzone.addEventListener(eventName, (e) => {
+    e.preventDefault();
+    dropzone.classList.remove('dragover');
+  }, false);
+});
+
+dropzone.addEventListener('drop', (e) => {
+  const dt = e.dataTransfer;
+  const files = dt.files;
+  if (files.length > 0) {
+    handleFile(files[0]);
+  }
+});
+
+function handleFileSelect(e) {
+  const files = e.target.files;
+  if (files.length > 0) {
+    handleFile(files[0]);
+  }
+}
+
+function handleFile(file) {
+  if (!file.type.startsWith('image/')) {
+    alert('Please upload an image file (PNG, JPG, JPEG).');
+    return;
+  }
+
+  // Show preview
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    document.getElementById('previewImg').src = e.target.result;
+    document.getElementById('imagePreviewCard').style.display = 'block';
+  }
+  reader.readAsDataURL(file);
+
+  runOCR(file);
+}
+
+// Reset page states
+function resetPage() {
+  document.getElementById('fileInput').value = '';
+  document.getElementById('imagePreviewCard').style.display = 'none';
+  document.getElementById('ocrStatusCard').style.display = 'none';
+  document.getElementById('ocrDebugDetails').style.display = 'none';
+  document.getElementById('ocrProgressBar').style.width = '0%';
+  
+  document.getElementById('waitingState').style.display = 'block';
+  document.getElementById('loadingState').style.display = 'none';
+  document.getElementById('matchesList').style.display = 'none';
+  document.getElementById('matchedInvoiceDetail').style.display = 'none';
+  document.getElementById('noMatchState').style.display = 'none';
+
+  allScoredMatches = [];
+  activeMatchIndex = null;
+  dbInvoices = [];
+}
+
+// Run Tesseract OCR in the browser
+async function runOCR(file) {
+  // Update state UI
+  document.getElementById('waitingState').style.display = 'none';
+  document.getElementById('loadingState').style.display = 'none';
+  document.getElementById('matchesList').style.display = 'none';
+  document.getElementById('matchedInvoiceDetail').style.display = 'none';
+  document.getElementById('noMatchState').style.display = 'none';
+  
+  document.getElementById('ocrStatusCard').style.display = 'block';
+  updateOcrStatus('Initializing OCR engine...', 5);
+
+  try {
+    const worker = await Tesseract.createWorker('eng', 1, {
+      logger: m => {
+        if (m.status === 'recognizing text') {
+          const progressPercent = Math.round(m.progress * 90) + 10;
+          updateOcrStatus(`Extracting handwritten text... ${progressPercent}%`, progressPercent);
+        } else {
+          // Convert status e.g. "loading tesseract core" to readable
+          const statusText = m.status.charAt(0).toUpperCase() + m.status.slice(1);
+          updateOcrStatus(`${statusText}...`, 8);
+        }
+      }
+    });
+
+    updateOcrStatus('Processing image and identifying characters...', 95);
+    const ret = await worker.recognize(file);
+    await worker.terminate();
+
+    const ocrText = ret.data.text;
+    updateOcrStatus('OCR complete!', 100);
+    setTimeout(() => {
+      document.getElementById('ocrStatusCard').style.display = 'none';
+    }, 800);
+
+    // Show debug details
+    document.getElementById('ocrDebugText').innerText = ocrText;
+    document.getElementById('ocrDebugDetails').style.display = 'block';
+
+    // Proceed to matching database
+    matchDatabase(ocrText);
+
+  } catch (error) {
+    console.error('OCR Error:', error);
+    alert('Failed to scan image. Please try again with a clearer image.');
+    resetPage();
+  }
+}
+
+function updateOcrStatus(message, percent) {
+  document.getElementById('ocrStatusText').innerText = message;
+  document.getElementById('ocrProgressBar').style.width = `${percent}%`;
+}
+
+// Score and retrieve database match
+async function matchDatabase(extractedText) {
+  document.getElementById('loadingState').style.display = 'block';
+  
+  try {
+    // 1. Fetch current invoices
+    const response = await fetch('/api/invoices');
+    dbInvoices = await response.json();
+
+    // 2. Parse text tokens
+    const cleanText = extractedText.toLowerCase().replace(/\s+/g, ' ');
+    
+    // Extract potential 10 digit phones
+    const phoneRegex = /\b\d{10}\b/g;
+    const ocrPhones = cleanText.match(phoneRegex) || [];
+
+    // Extract potential invoice numbers (e.g. #3, "No: 5", "Invoice 8")
+    const invoiceRegex = /(?:invoice|inv|bill|no|num|#)\s*:?\s*#?\s*(\d+)\b/g;
+    let match;
+    const ocrInvoiceNos = [];
+    while ((match = invoiceRegex.exec(cleanText)) !== null) {
+      ocrInvoiceNos.push(match[1]);
+    }
+    
+    // Extract potential monetary totals
+    // Get all floating point or integer values from the text
+    const numericValues = (cleanText.match(/\b\d+(?:\.\d{1,2})?\b/g) || []).map(val => parseFloat(val));
+
+    // 3. Compute matching scores
+    const scoredMatches = dbInvoices.map(invoice => {
+      let score = 0;
+      const reasons = [];
+
+      // A. Invoice number match (+50)
+      if (invoice.invoice && ocrInvoiceNos.includes(String(invoice.invoice))) {
+        score += 50;
+        reasons.push(`Invoice No #${invoice.invoice} matches OCR`);
+      }
+
+      // B. Mobile number match (+35)
+      if (invoice.cmobile && ocrPhones.includes(String(invoice.cmobile))) {
+        score += 35;
+        reasons.push(`Mobile ${invoice.cmobile} matches OCR`);
+      }
+
+      // C. Customer name match (+25 for full, +10 per part)
+      if (invoice.cname) {
+        const cnameLower = invoice.cname.toLowerCase();
+        if (cleanText.includes(cnameLower)) {
+          score += 25;
+          reasons.push(`Customer "${invoice.cname}" matches OCR`);
+        } else {
+          // Check parts
+          const parts = cnameLower.split(/\s+/).filter(p => p.length > 2);
+          let matchPartsCount = 0;
+          parts.forEach(part => {
+            if (cleanText.includes(part)) matchPartsCount++;
+          });
+          if (matchPartsCount > 0) {
+            score += (matchPartsCount * 10);
+            reasons.push(`${matchPartsCount} part(s) of Customer name match`);
+          }
+        }
+      }
+
+      // D. Total value match (+20 for exact, +15 for close)
+      if (invoice.total) {
+        const invTotal = parseFloat(invoice.total);
+        if (numericValues.includes(invTotal)) {
+          score += 20;
+          reasons.push(`Total ₹${invTotal} matches OCR exactly`);
+        } else {
+          // Check for close float matches (within 2% or 2 rupees)
+          const closeFloat = numericValues.find(v => Math.abs(v - invTotal) <= 2 || Math.abs(v - invTotal) / invTotal < 0.02);
+          if (closeFloat !== undefined) {
+            score += 15;
+            reasons.push(`Total ₹${invTotal} matches close value ₹${closeFloat}`);
+          }
+        }
+      }
+
+      // E. Item match (+5 per item matched)
+      if (invoice.items && invoice.items.length > 0) {
+        let matchedItems = 0;
+        invoice.items.forEach(item => {
+          if (item.name && cleanText.includes(item.name.toLowerCase())) {
+            matchedItems++;
+          }
+        });
+        if (matchedItems > 0) {
+          score += (matchedItems * 5);
+          reasons.push(`${matchedItems} item(s) match: ${invoice.items.map(i => i.name).join(', ')}`);
+        }
+      }
+
+      return { invoice, score, reasons };
+    });
+
+    // Sort by score descending and filter out trivial matches (score <= 5)
+    allScoredMatches = scoredMatches
+      .filter(m => m.score > 5)
+      .sort((a, b) => b.score - a.score);
+
+    document.getElementById('loadingState').style.display = 'none';
+
+    if (allScoredMatches.length === 0) {
+      document.getElementById('noMatchState').style.display = 'block';
+      return;
+    }
+
+    // If we have matches, display them
+    displayMatches();
+
+  } catch (error) {
+    console.error('Matching Error:', error);
+    alert('Failed to search database for matching invoice.');
+    resetPage();
+  }
+}
+
+function displayMatches() {
+  const matchesList = document.getElementById('matchesList');
+  const matchesContainer = document.getElementById('matchesContainer');
+  matchesContainer.innerHTML = '';
+
+  // If multiple items, show matching options list
+  if (allScoredMatches.length > 1) {
+    matchesList.style.display = 'block';
+    
+    allScoredMatches.forEach((match, idx) => {
+      const itemDiv = document.createElement('div');
+      itemDiv.className = 'match-item' + (idx === 0 ? ' active' : '');
+      itemDiv.id = `match-item-${idx}`;
+      itemDiv.onclick = () => selectMatch(idx);
+
+      let badgeClass = 'low';
+      if (match.score >= 50) badgeClass = 'high';
+      else if (match.score >= 20) badgeClass = 'medium';
+
+      const total = Number(match.invoice.total) || 0;
+      const dateStr = match.invoice.dateTime || new Date(match.invoice.createdAt).toLocaleString();
+
+      itemDiv.innerHTML = `
+        <div>
+          <strong>#${match.invoice.invoice || (idx + 1)} - ${match.invoice.cname || 'N/A'}</strong>
+          <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 3px;">
+            Total: ₹${total.toFixed(2)} | Mobile: ${match.invoice.cmobile || 'N/A'}
+          </div>
+          <div style="font-size: 0.75rem; color: var(--primary); font-weight: 500; margin-top: 4px;">
+            Matched on: ${match.reasons.slice(0, 2).join(', ')}
+          </div>
+        </div>
+        <span class="match-badge ${badgeClass}">${match.score} pts</span>
+      `;
+      matchesContainer.appendChild(itemDiv);
+    });
+  } else {
+    matchesList.style.display = 'none';
+  }
+
+  // Select the top match by default
+  selectMatch(0);
+}
+
+function selectMatch(index) {
+  // Update active item highlight if multiple matches exist
+  if (allScoredMatches.length > 1) {
+    for (let i = 0; i < allScoredMatches.length; i++) {
+      const el = document.getElementById(`match-item-${i}`);
+      if (el) {
+        if (i === index) el.classList.add('active');
+        else el.classList.remove('active');
+      }
+    }
+  }
+
+  activeMatchIndex = index;
+  const match = allScoredMatches[index];
+  const invoice = match.invoice;
+
+  // Render invoice detail
+  const container = document.getElementById('invoicePreviewContent');
+  
+  let itemsHTML = '';
+  let subtotal = 0;
+  if (invoice.items) {
+    invoice.items.forEach((item, idx) => {
+      const itemTotal = Number(item.total) || (Number(item.price) * Number(item.qty)) || 0;
+      subtotal += itemTotal;
+      itemsHTML += `
+        <tr>
+          <td style="padding: 0.5rem 0.75rem;">${idx + 1}</td>
+          <td style="padding: 0.5rem 0.75rem;">${item.name}</td>
+          <td style="padding: 0.5rem 0.75rem;">₹${Number(item.price).toFixed(2)}</td>
+          <td style="padding: 0.5rem 0.75rem;">${item.qty}</td>
+          <td style="padding: 0.5rem 0.75rem;">₹${itemTotal.toFixed(2)}</td>
+        </tr>
+      `;
+    });
+  }
+
+  const gstPercent = Number(invoice.gst) || 0;
+  const discPercent = Number(invoice.discount) || 0;
+  const gstAmt = subtotal * gstPercent / 100;
+  const discAmt = subtotal * discPercent / 100;
+  const grandTotal = subtotal + gstAmt - discAmt;
+
+  let badgeClass = 'low';
+  if (match.score >= 50) badgeClass = 'high';
+  else if (match.score >= 20) badgeClass = 'medium';
+
+  container.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid var(--border); padding-bottom: 1rem; margin-bottom: 1.5rem;">
+      <div>
+        <h2 style="margin-bottom: 0px;">Grocery Store</h2>
+        <small style="color: var(--text-muted)">Main Road, Solapur</small>
+      </div>
+      <div style="text-align: right;">
+        <span class="match-badge ${badgeClass}" style="font-size: 0.9rem; padding: 4px 10px;">${match.score} Point Match</span>
+        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 5px;">Score matches OCR text</div>
+      </div>
+    </div>
+    
+    <div style="display: flex; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 10px; font-size: 0.95rem;">
+      <div>
+        <p><b>Invoice No:</b> ${invoice.invoice || 'N/A'}</p>
+        <p><b>Date:</b> ${invoice.dateTime || new Date(invoice.createdAt).toLocaleString()}</p>
+      </div>
+      <div style="text-align: right;">
+        <p><b>Customer:</b> ${invoice.cname || 'N/A'}</p>
+        <p><b>Mobile:</b> ${invoice.cmobile || 'N/A'}</p>
+      </div>
+    </div>
+
+    <div class="table-wrap" style="margin-bottom: 1.5rem;">
+      <table style="width: 100%; font-size: 0.9rem;">
+        <thead>
+          <tr>
+            <th style="padding: 0.5rem 0.75rem;">#</th>
+            <th style="padding: 0.5rem 0.75rem;">Item</th>
+            <th style="padding: 0.5rem 0.75rem;">Price</th>
+            <th style="padding: 0.5rem 0.75rem;">Qty</th>
+            <th style="padding: 0.5rem 0.75rem;">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${itemsHTML || "<tr><td colspan='5' style='text-align:center;'>No items in this invoice</td></tr>"}
+        </tbody>
+      </table>
+    </div>
+
+    <div style="text-align: right; line-height: 1.6; border-top: 1px solid var(--border); padding-top: 1rem; font-size: 0.95rem;">
+      <p>Sub Total: ₹${subtotal.toFixed(2)}</p>
+      <p>GST (${gstPercent}%): ₹${gstAmt.toFixed(2)}</p>
+      <p>Discount (${discPercent}%): ₹${discAmt.toFixed(2)}</p>
+      <h3 style="color: var(--primary); margin-top: 0.5rem; font-size: 1.4rem;">Grand Total: ₹${grandTotal.toFixed(2)}</h3>
+      <p style="margin-top: 0.25rem; font-size: 0.9rem;"><b>Payment Method:</b> ${invoice.paymentType || 'Cash'}</p>
+    </div>
+  `;
+
+  // Update button event handlers
+  document.getElementById('btnPrintInvoice').onclick = printSelectedInvoice;
+  document.getElementById('btnDownloadPDF').onclick = downloadSelectedInvoicePDF;
+
+  document.getElementById('matchedInvoiceDetail').style.display = 'block';
+}
+
+function printSelectedInvoice() {
+  const match = allScoredMatches[activeMatchIndex];
+  if (!match) return;
+  const bill = match.invoice;
+
+  let printWindow = window.open("", "_blank", "width=800,height=600");
+  
+  let itemsHTML = "";
+  let subtotal = 0;
+  if (bill.items) {
+    bill.items.forEach((item, idx) => {
+      let itemTotal = Number(item.total) || (Number(item.price) * Number(item.qty)) || 0;
+      subtotal += itemTotal;
+      itemsHTML += `
+        <tr>
+          <td style="padding: 8px; border-bottom: 1px solid #ddd;">${idx + 1}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #ddd;">${item.name}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #ddd;">₹${Number(item.price).toFixed(2)}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #ddd;">${item.qty}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #ddd;">₹${itemTotal.toFixed(2)}</td>
+        </tr>
+      `;
+    });
+  }
+
+  let gstPercent = Number(bill.gst) || 0;
+  let discPercent = Number(bill.discount) || 0;
+  let gstAmt = subtotal * gstPercent / 100;
+  let discAmt = subtotal * discPercent / 100;
+  let grandTotal = subtotal + gstAmt - discAmt;
+
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>Invoice #${bill.invoice || activeMatchIndex + 1}</title>
+        <style>
+          body { font-family: 'Segoe UI', sans-serif; padding: 20px; color: #333; }
+          .receipt { max-width: 600px; margin: auto; border: 1px solid #ddd; padding: 20px; border-radius: 8px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th { background: #f4f4f4; padding: 8px; text-align: left; border-bottom: 2px solid #ddd; }
+          .total-section { text-align: right; margin-top: 20px; line-height: 1.6; }
+        </style>
+      </head>
+      <body>
+        <div class="receipt">
+          <div style="text-align: center; border-bottom: 2px solid #ddd; padding-bottom: 10px;">
+            <h2>Grocery Store</h2>
+            <small>Main Road, Solapur</small>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-top: 20px; font-size: 14px;">
+            <div>
+              <p><b>Invoice No:</b> ${bill.invoice || "N/A"}</p>
+              <p><b>Date:</b> ${bill.dateTime || new Date(bill.createdAt).toLocaleString()}</p>
+            </div>
+            <div style="text-align: right;">
+              <p><b>Customer:</b> ${bill.cname || "N/A"}</p>
+              <p><b>Mobile:</b> ${bill.cmobile || "N/A"}</p>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Item</th>
+                <th>Price</th>
+                <th>Qty</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHTML}
+            </tbody>
+          </table>
+          <div class="total-section">
+            <p>Sub Total: ₹${subtotal.toFixed(2)}</p>
+            <p>GST (${gstPercent}%): ₹${gstAmt.toFixed(2)}</p>
+            <p>Discount (${discPercent}%): ₹${discAmt.toFixed(2)}</p>
+            <h3 style="color: #10b981; font-size: 18px; margin-top: 10px;">Grand Total: ₹${grandTotal.toFixed(2)}</h3>
+            <p style="font-size: 13px; margin-top: 5px;"><b>Payment Method:</b> ${bill.paymentType || "Cash"}</p>
+          </div>
+        </div>
+        <script>
+          window.onload = function() {
+            window.print();
+            setTimeout(function() { window.close(); }, 500);
+          }
+        <\/script>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+}
+
+function downloadSelectedInvoicePDF() {
+  const match = allScoredMatches[activeMatchIndex];
+  if (!match) return;
+  const bill = match.invoice;
+
+  const { jsPDF } = window.jspdf;
+  let doc = new jsPDF();
+  
+  doc.setFontSize(22);
+  doc.text("Grocery Store Invoice", 20, 20);
+  doc.setFontSize(10);
+  doc.text("Main Road, Solapur", 20, 26);
+  
+  doc.line(20, 30, 190, 30);
+  
+  doc.setFontSize(12);
+  doc.text("Invoice No: " + (bill.invoice || "N/A"), 20, 40);
+  doc.text("Date: " + (bill.dateTime || new Date(bill.createdAt).toLocaleString()), 20, 47);
+  
+  doc.text("Customer Name: " + (bill.cname || "N/A"), 120, 40);
+  doc.text("Mobile Number: " + (bill.cmobile || "N/A"), 120, 47);
+  
+  doc.line(20, 52, 190, 52);
+  
+  let y = 60;
+  doc.text("Item Name", 20, y);
+  doc.text("Price", 90, y);
+  doc.text("Qty", 130, y);
+  doc.text("Total", 160, y);
+  doc.line(20, y+2, 190, y+2);
+  y += 10;
+  
+  let subtotal = 0;
+  if (bill.items) {
+    bill.items.forEach(item => {
+      let itemTotal = Number(item.total) || (Number(item.price) * Number(item.qty)) || 0;
+      subtotal += itemTotal;
+      
+      doc.text(item.name, 20, y);
+      doc.text("₹" + Number(item.price).toFixed(2), 90, y);
+      doc.text(String(item.qty), 130, y);
+      doc.text("₹" + itemTotal.toFixed(2), 160, y);
+      y += 8;
+    });
+  }
+  
+  doc.line(20, y, 190, y);
+  y += 8;
+  
+  let gstPercent = Number(bill.gst) || 0;
+  let discPercent = Number(bill.discount) || 0;
+  let gstAmt = subtotal * gstPercent / 100;
+  let discAmt = subtotal * discPercent / 100;
+  let grandTotal = subtotal + gstAmt - discAmt;
+  
+  doc.text("Subtotal: ₹" + subtotal.toFixed(2), 130, y);
+  y += 6;
+  doc.text(`GST (${gstPercent}%): ₹` + gstAmt.toFixed(2), 130, y);
+  y += 6;
+  doc.text(`Discount (${discPercent}%): ₹` + discAmt.toFixed(2), 130, y);
+  y += 8;
+  
+  doc.setFontSize(14);
+  doc.text("Grand Total: ₹" + grandTotal.toFixed(2), 120, y);
+  y += 8;
+  doc.setFontSize(12);
+  doc.text("Payment Method: " + (bill.paymentType || "Cash"), 20, y);
+  
+  doc.save(`invoice_${bill.invoice || activeMatchIndex + 1}.pdf`);
+}
+
+// Navigation helpers
+function go(page) {
+  window.location.href = page;
+}
+
+async function logout() {
+  if (await showConfirm("Are you sure you want to logout?")) {
+    localStorage.clear();
+    alert("Logged out successfully");
+    window.location.href = "a_login.html";
+  }
+}
+
+function toggleMode() {
+  document.body.classList.toggle("dark-mode");
+}
+</script>
+
+</body>
+</html>
