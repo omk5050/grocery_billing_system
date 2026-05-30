@@ -110,8 +110,13 @@ app.get('/api/products', async (req, res) => {
 // Add a new product
 app.post('/api/products', async (req, res) => {
   try {
-    const { name, price, qty } = req.body;
-    const newProduct = new Product({ name, price: Number(price), qty: Number(qty) || 0 });
+    const { name, price, qty, barcode } = req.body;
+    const newProduct = new Product({ 
+      name, 
+      price: Number(price), 
+      qty: Number(qty) || 0,
+      barcode: barcode || ""
+    });
     await newProduct.save();
     res.status(201).json(newProduct);
   } catch (error) {

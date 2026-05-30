@@ -61,13 +61,7 @@
       <p id="todayBills">0</p>
     </div>
 
-    <div class="card" style="position: relative;">
-      <h3>Low Stock</h3>
-      <p style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 0;">
-        <span id="lowStock">0</span>
-        <span id="lowStockBadge" style="width: 10px; height: 10px; border-radius: 50%; background: #ef4444; display: none; animation: pulse 1.5s infinite;"></span>
-      </p>
-    </div>
+
   </div>
 
   <!-- SALES ANALYTICS CHART -->
@@ -130,17 +124,7 @@ async function loadDashboardData() {
     dbProducts = await prodRes.json();
     document.getElementById("totalProduct").innerText = dbProducts.length;
     
-    // Calculate Low Stock (qty < 5)
-    let lowStockCount = dbProducts.filter(p => p.qty < 5).length;
-    document.getElementById("lowStock").innerText = lowStockCount;
 
-    // Toggle blinking red indicator for low stock
-    const stockBadge = document.getElementById("lowStockBadge");
-    if (lowStockCount > 0) {
-      stockBadge.style.display = "inline-block";
-    } else {
-      stockBadge.style.display = "none";
-    }
 
     // 2. Fetch Invoices
     const invRes = await fetch('/api/invoices');
@@ -439,7 +423,6 @@ function exportPDF() {
   doc.text("Total Products: " + document.getElementById("totalProduct").innerText, 20, 50);
   doc.text("Total Sales: " + document.getElementById("totalSales").innerText, 20, 60);
   doc.text("Today's Bills: " + document.getElementById("todayBills").innerText, 20, 70);
-  doc.text("Low Stock Products: " + document.getElementById("lowStock").innerText, 20, 80);
   
   doc.line(20, 90, 190, 90);
   doc.setFontSize(14);
