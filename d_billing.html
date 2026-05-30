@@ -261,7 +261,7 @@ function toggleMode(){
 }
 
 /* ADD ITEM */
-function addItem(){
+async function addItem(){
 
   let name = pname.value.trim();
   let priceVal = Number(price.value);
@@ -295,6 +295,32 @@ function addItem(){
   `;
 
   calculateTotal();
+
+  // Check if product exists in our local list, if not add to DB
+  let matchedProduct = dbProducts.find(p => p.name.toLowerCase() === name.toLowerCase());
+  if (!matchedProduct) {
+    try {
+      const response = await fetch('/api/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name, price: priceVal, qty: 0 })
+      });
+      if (response.ok) {
+        const newProduct = await response.json();
+        dbProducts.push(newProduct);
+        
+        // Add to autocomplete datalist suggestions
+        let datalist = document.getElementById("productSuggestions");
+        let option = document.createElement("option");
+        option.value = newProduct.name;
+        datalist.appendChild(option);
+        
+        console.log(`Product "${name}" auto-saved to database.`);
+      }
+    } catch (error) {
+      console.error("Error auto-saving new product:", error);
+    }
+  }
 
   pname.value = "";
   price.value = "";
